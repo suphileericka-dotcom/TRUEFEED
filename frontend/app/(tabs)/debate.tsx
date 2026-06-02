@@ -5,23 +5,28 @@ import {
   Chip,
   ProgressBar,
   ScreenShell,
+  SeasonSwitcher,
   SectionLabel,
 } from '@/components/truefeed/ui';
 import { debateTopics, fonts, seasonThemes } from '@/constants/truefeed';
+import { useGlobalSeason } from '@/hooks/use-global-season';
 
 export default function DebateScreen() {
-  const theme = seasonThemes.spring;
+  const { selectedSeason, setSelectedSeason } = useGlobalSeason();
+  const theme = seasonThemes[selectedSeason];
 
   return (
     <ScreenShell theme={theme}>
       <BrandHeader
         theme={theme}
-        badgeText="Mode Printemps"
+        badgeText={`Mode ${theme.label}`}
         badgeIcon={theme.emoji}
         actions={[{ icon: 'notifications' }, { icon: 'mail' }]}
       />
 
-      <SectionLabel theme={theme} label="TrueDebate - Printemps" />
+      <SeasonSwitcher selectedSeason={selectedSeason} onSelect={setSelectedSeason} />
+
+      <SectionLabel theme={theme} label={`TrueDebate - ${theme.label}`} />
 
       <View style={styles.filters}>
         <Chip label="Debats" icon="💬" backgroundColor={theme.accentStrong} textColor="#FFFFFF" />
@@ -40,7 +45,7 @@ export default function DebateScreen() {
       </View>
 
       <View style={[styles.heroCard, { backgroundColor: theme.accentStrong }]}>
-        <Text style={styles.heroEyebrow}>Topic printemps</Text>
+        <Text style={styles.heroEyebrow}>Topic {theme.label}</Text>
         <Text style={styles.heroTitle}>Le Japon en Hanami : surestime ou incontournable ?</Text>
         <View style={styles.heroButton}>
           <Text style={styles.heroButtonText}>Rejoindre le debat</Text>

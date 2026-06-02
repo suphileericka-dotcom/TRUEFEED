@@ -1,4 +1,6 @@
 import { Platform } from 'react-native';
+import type { ComponentProps } from 'react';
+import type { Ionicons } from '@expo/vector-icons';
 
 export type SeasonKey = 'summer' | 'autumn' | 'winter' | 'spring';
 
@@ -248,3 +250,80 @@ export const attachmentOptions = [
 ];
 
 export const visibilityOptions = ['Public', 'Amis', 'Brouillon prive'];
+
+export type TruefeedSpaceKey = 'feed' | 'vlog' | 'bonplan' | 'publish' | 'explore' | 'debate';
+
+type SpaceIconName = ComponentProps<typeof Ionicons>['name'];
+
+export type TruefeedSpace = {
+  key: TruefeedSpaceKey;
+  label: string;
+  route: string;
+  season: SeasonKey;
+  activeIcon: SpaceIconName;
+  inactiveIcon: SpaceIconName;
+};
+
+export const truefeedSpaces: TruefeedSpace[] = [
+  {
+    key: 'feed',
+    label: 'Accueil',
+    route: 'index',
+    season: 'summer',
+    activeIcon: 'home',
+    inactiveIcon: 'home-outline',
+  },
+  {
+    key: 'vlog',
+    label: 'VlogFeed',
+    route: 'index',
+    season: 'summer',
+    activeIcon: 'play-circle',
+    inactiveIcon: 'play-circle-outline',
+  },
+  {
+    key: 'bonplan',
+    label: 'BonPlan',
+    route: 'bonplan',
+    season: 'autumn',
+    activeIcon: 'pricetag',
+    inactiveIcon: 'pricetag-outline',
+  },
+  {
+    key: 'publish',
+    label: 'Publier',
+    route: 'publish',
+    season: 'autumn',
+    activeIcon: 'add-circle',
+    inactiveIcon: 'add-circle-outline',
+  },
+  {
+    key: 'explore',
+    label: 'Explore',
+    route: 'explore',
+    season: 'winter',
+    activeIcon: 'map',
+    inactiveIcon: 'map-outline',
+  },
+  {
+    key: 'debate',
+    label: 'TrueDebate',
+    route: 'debate',
+    season: 'spring',
+    activeIcon: 'chatbubble-ellipses',
+    inactiveIcon: 'chatbubble-ellipses-outline',
+  },
+];
+
+export const publishMediaOptions = [
+  { key: 'image', label: 'Image', icon: 'image-outline' },
+  { key: 'video', label: 'Video', icon: 'videocam-outline' },
+  { key: 'text', label: 'Texte', icon: 'document-text-outline' },
+] as const;
+
+export const seasonalTags: Record<SeasonKey, string[]> = {
+  summer: ['soleil', 'plage', 'roadtrip', 'festival'],
+  autumn: ['feuilles', 'ville', 'marche', 'food'],
+  winter: ['neige', 'montagne', 'cocooning', 'budget'],
+  spring: ['hanami', 'nature', 'culture', 'slowtravel'],
+};

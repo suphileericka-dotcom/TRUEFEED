@@ -55,6 +55,25 @@ type ProgressBarProps = {
   backgroundColor: string;
 };
 
+type UiState = 'loading' | 'empty' | 'error' | 'offline';
+
+type StatePanelProps = {
+  theme: SeasonTheme;
+  state: UiState;
+  title: string;
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+};
+
+type SpaceIconProps = {
+  active: boolean;
+  activeName: ComponentProps<typeof Ionicons>['name'];
+  inactiveName: ComponentProps<typeof Ionicons>['name'];
+  color: string;
+  size?: number;
+};
+
 export function ScreenShell({ children, theme, contentContainerStyle }: ScreenShellProps) {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
@@ -185,6 +204,54 @@ export function ProgressBar({ value, color, backgroundColor }: ProgressBarProps)
   );
 }
 
+export function StatePanel({
+  theme,
+  state,
+  title,
+  message,
+  actionLabel,
+  onAction,
+}: StatePanelProps) {
+  const iconByState: Record<UiState, ComponentProps<typeof Ionicons>['name']> = {
+    loading: 'sync',
+    empty: 'file-tray-outline',
+    error: 'warning-outline',
+    offline: 'cloud-offline-outline',
+  };
+
+  return (
+    <View
+      style={[styles.statePanel, { backgroundColor: theme.surface, borderColor: theme.border }]}
+    >
+      <View style={[styles.stateIcon, { backgroundColor: theme.accentSoft }]}>
+        <Ionicons name={iconByState[state]} size={22} color={theme.accentStrong} />
+      </View>
+      <View style={styles.stateCopy}>
+        <Text style={[styles.stateTitle, { color: theme.text }]}>{title}</Text>
+        <Text style={[styles.stateMessage, { color: theme.muted }]}>{message}</Text>
+      </View>
+      {actionLabel ? (
+        <Pressable
+          onPress={onAction}
+          style={[styles.stateAction, { backgroundColor: theme.accentStrong }]}
+        >
+          <Text style={styles.stateActionText}>{actionLabel}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+export function SpaceIcon({ active, activeName, inactiveName, color, size = 24 }: SpaceIconProps) {
+  return (
+    <Ionicons
+      name={active ? activeName : inactiveName}
+      size={active ? size + 2 : size}
+      color={color}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -282,5 +349,45 @@ const styles = StyleSheet.create({
   progressFill: {
     borderRadius: 999,
     height: '100%',
+  },
+  statePanel: {
+    alignItems: 'center',
+    borderRadius: 24,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 14,
+    padding: 16,
+  },
+  stateIcon: {
+    alignItems: 'center',
+    borderRadius: 18,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  stateCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  stateTitle: {
+    fontFamily: fonts.body,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  stateMessage: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  stateAction: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  stateActionText: {
+    color: '#FFFFFF',
+    fontFamily: fonts.body,
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

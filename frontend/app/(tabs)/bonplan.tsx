@@ -1,15 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
+import { Chip, ScreenShell, SeasonSwitcher, SectionLabel } from '@/components/truefeed/ui';
 import { destinationSpotlight, fonts, seasonThemes } from '@/constants/truefeed';
+import { useGlobalSeason } from '@/hooks/use-global-season';
 
 export default function BonPlanScreen() {
-  const theme = seasonThemes.autumn;
+  const { selectedSeason, setSelectedSeason } = useGlobalSeason();
+  const theme = seasonThemes[selectedSeason];
 
   return (
     <ScreenShell theme={theme}>
-      <SectionLabel theme={theme} label="Fiche destination - Automne" />
+      <SeasonSwitcher selectedSeason={selectedSeason} onSelect={setSelectedSeason} />
+
+      <SectionLabel theme={theme} label={`Fiche destination - ${theme.label}`} />
 
       <View
         style={[
@@ -25,7 +29,7 @@ export default function BonPlanScreen() {
           </View>
 
           <Chip
-            label="Mode Automne"
+            label={`Mode ${theme.label}`}
             icon={theme.emoji}
             backgroundColor="rgba(60, 28, 14, 0.26)"
             textColor="#FFFFFF"
@@ -36,7 +40,7 @@ export default function BonPlanScreen() {
           </View>
         </View>
 
-        <Text style={styles.heroEmoji}>🍁</Text>
+        <Text style={styles.heroEmoji}>{theme.emoji}</Text>
         <Text style={styles.city}>{destinationSpotlight.city}</Text>
         <Text style={styles.region}>{destinationSpotlight.region}</Text>
       </View>
@@ -76,7 +80,9 @@ export default function BonPlanScreen() {
           },
         ]}
       >
-        <Text style={[styles.tipLabel, { color: theme.accentStrong }]}>Conseil automne</Text>
+        <Text style={[styles.tipLabel, { color: theme.accentStrong }]}>
+          Conseil {theme.label}
+        </Text>
         <Text style={[styles.tipText, { color: theme.text }]}>{destinationSpotlight.tip}</Text>
       </View>
 

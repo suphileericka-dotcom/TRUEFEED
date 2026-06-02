@@ -10,9 +10,15 @@ const dataSchema = {
       bio: { type: 'string', required: false },
       role: { type: 'enum', values: ['user', 'moderator', 'admin'], default: 'user' },
       status: { type: 'enum', values: ['active', 'suspended', 'deleted'], default: 'active' },
+      lastSeenAt: { type: 'datetime', required: false },
       createdAt: { type: 'datetime', required: true },
       updatedAt: { type: 'datetime', required: true },
     },
+    indexes: [
+      { name: 'users_username_key', fields: ['lower(username)'], unique: true },
+      { name: 'users_email_key', fields: ['lower(email)'], unique: true },
+      { name: 'users_status_created_at_idx', fields: ['status', 'createdAt'] },
+    ],
   },
   posts: {
     description: 'Publications du feed: vlog, photo, bon plan ou debat.',
@@ -31,9 +37,25 @@ const dataSchema = {
         values: ['draft', 'published', 'hidden', 'deleted'],
         default: 'published',
       },
+      publishedAt: { type: 'datetime', required: false },
       createdAt: { type: 'datetime', required: true },
       updatedAt: { type: 'datetime', required: true },
     },
+    rules: ['Un post publie doit avoir publishedAt.'],
+    indexes: [
+      {
+        name: 'posts_feed_idx',
+        fields: ['status', 'publishedAt', 'id'],
+        where: "status = 'published'",
+      },
+      { name: 'posts_author_date_idx', fields: ['authorId', 'createdAt'] },
+      { name: 'posts_date_idx', fields: ['createdAt'] },
+      {
+        name: 'posts_season_date_idx',
+        fields: ['season', 'publishedAt'],
+        where: "status = 'published'",
+      },
+    ],
   },
   tags: {
     description: 'Mots-cles pour classer les posts et faciliter Explore.',
@@ -51,6 +73,7 @@ const dataSchema = {
       tagId: { type: 'string', required: true, references: 'tags.id' },
     },
     unique: [['postId', 'tagId']],
+    indexes: [{ name: 'post_tags_tag_post_idx', fields: ['tagId', 'postId'] }],
   },
   comments: {
     description: 'Commentaires de posts, avec support de reponses imbriquees.',

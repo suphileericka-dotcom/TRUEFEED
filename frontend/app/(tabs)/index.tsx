@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -9,18 +8,18 @@ import {
   ScreenShell,
   SeasonSwitcher,
   SectionLabel,
+  StatePanel,
 } from '@/components/truefeed/ui';
 import {
   feedBySeason,
   fonts,
-  getSeasonFromDate,
   seasonThemes,
   storyUsers,
-  type SeasonKey,
 } from '@/constants/truefeed';
+import { useGlobalSeason } from '@/hooks/use-global-season';
 
 export default function HomeScreen() {
-  const [selectedSeason, setSelectedSeason] = useState<SeasonKey>(getSeasonFromDate());
+  const { selectedSeason, setSelectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
   const feed = feedBySeason[selectedSeason];
 
@@ -36,6 +35,35 @@ export default function HomeScreen() {
       <SeasonSwitcher selectedSeason={selectedSeason} onSelect={setSelectedSeason} />
 
       <SectionLabel theme={theme} label={`Feed principal - ${theme.label}`} />
+
+      <View style={styles.stateGrid}>
+        <StatePanel
+          theme={theme}
+          state="loading"
+          title="Chargement"
+          message="Recuperation du feed en cours."
+        />
+        <StatePanel
+          theme={theme}
+          state="empty"
+          title="Aucun post"
+          message="Suis des voyageurs ou change de saison."
+          actionLabel="Explorer"
+        />
+        <StatePanel
+          theme={theme}
+          state="error"
+          title="Erreur"
+          message="Impossible de synchroniser le feed."
+          actionLabel="Reessayer"
+        />
+        <StatePanel
+          theme={theme}
+          state="offline"
+          title="Hors ligne"
+          message="Derniers posts gardes en cache."
+        />
+      </View>
 
       <View style={styles.storyRow}>
         {storyUsers.map((name, index) => (
@@ -109,7 +137,7 @@ export default function HomeScreen() {
             textColor={theme.accentStrong}
           />
           <Pressable
-            onPress={() => router.push('/publish')}
+            onPress={() => router.push(`/publish?season=${selectedSeason}`)}
             style={[
               styles.quickPostButton,
               {
@@ -143,6 +171,9 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  stateGrid: {
+    gap: 10,
+  },
   storyRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -1,9 +1,16 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { Ionicons } from '@expo/vector-icons';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { seasonThemes } from '@/constants/truefeed';
+import { SpaceIcon } from '@/components/truefeed/ui';
+import {
+  getSeasonFromDate,
+  seasonOrder,
+  seasonThemes,
+  truefeedSpaces,
+  type SeasonKey,
+  type TruefeedSpaceKey,
+} from '@/constants/truefeed';
 
 function createTabBarStyle(backgroundColor: string, borderColor: string) {
   return {
@@ -17,71 +24,112 @@ function createTabBarStyle(backgroundColor: string, borderColor: string) {
   } as const;
 }
 
+function getSpace(key: TruefeedSpaceKey) {
+  return truefeedSpaces.find((space) => space.key === key) ?? truefeedSpaces[0];
+}
+
+function getSeasonParam(value: string | string[] | undefined): SeasonKey {
+  const season = Array.isArray(value) ? value[0] : value;
+
+  return seasonOrder.includes(season as SeasonKey) ? (season as SeasonKey) : getSeasonFromDate();
+}
+
 export default function TabLayout() {
+  const params = useLocalSearchParams<{ season?: string | string[] }>();
+  const selectedSeason = getSeasonParam(params.season);
+  const theme = seasonThemes[selectedSeason];
+  const feedSpace = getSpace('feed');
+  const bonplanSpace = getSpace('bonplan');
+  const publishSpace = getSpace('publish');
+  const exploreSpace = getSpace('explore');
+  const debateSpace = getSpace('debate');
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarHideOnKeyboard: true,
-        tabBarInactiveTintColor: '#9C91B3',
+        tabBarActiveTintColor: theme.accentStrong,
+        tabBarInactiveTintColor: theme.muted,
         tabBarShowLabel: false,
+        tabBarStyle: createTabBarStyle(theme.tabBar, theme.border),
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Accueil',
-          tabBarActiveTintColor: seasonThemes.summer.accentStrong,
+          href: `/?season=${selectedSeason}`,
+          title: feedSpace.label,
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name="home" size={focused ? 28 : 24} color={color} />
+            <SpaceIcon
+              active={focused}
+              activeName={feedSpace.activeIcon}
+              inactiveName={feedSpace.inactiveIcon}
+              color={color}
+            />
           ),
-          tabBarStyle: createTabBarStyle(seasonThemes.summer.tabBar, seasonThemes.summer.border),
         }}
       />
       <Tabs.Screen
         name="bonplan"
         options={{
-          title: 'BonPlan',
-          tabBarActiveTintColor: seasonThemes.autumn.accentStrong,
+          href: `/bonplan?season=${selectedSeason}`,
+          title: bonplanSpace.label,
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name="search" size={focused ? 28 : 24} color={color} />
+            <SpaceIcon
+              active={focused}
+              activeName={bonplanSpace.activeIcon}
+              inactiveName={bonplanSpace.inactiveIcon}
+              color={color}
+            />
           ),
-          tabBarStyle: createTabBarStyle(seasonThemes.autumn.tabBar, seasonThemes.autumn.border),
         }}
       />
       <Tabs.Screen
         name="publish"
         options={{
-          title: 'Publier',
-          tabBarActiveTintColor: seasonThemes.autumn.accentStrong,
+          href: `/publish?season=${selectedSeason}`,
+          title: publishSpace.label,
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name="add-circle" size={focused ? 32 : 28} color={color} />
+            <SpaceIcon
+              active={focused}
+              activeName={publishSpace.activeIcon}
+              inactiveName={publishSpace.inactiveIcon}
+              color={color}
+              size={28}
+            />
           ),
-          tabBarStyle: createTabBarStyle(seasonThemes.autumn.tabBar, seasonThemes.autumn.border),
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Explore',
-          tabBarActiveTintColor: seasonThemes.winter.accent,
-          tabBarInactiveTintColor: '#7B87A4',
+          href: `/explore?season=${selectedSeason}`,
+          title: exploreSpace.label,
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name="map" size={focused ? 28 : 24} color={color} />
+            <SpaceIcon
+              active={focused}
+              activeName={exploreSpace.activeIcon}
+              inactiveName={exploreSpace.inactiveIcon}
+              color={color}
+            />
           ),
-          tabBarStyle: createTabBarStyle(seasonThemes.winter.tabBar, seasonThemes.winter.border),
         }}
       />
       <Tabs.Screen
         name="debate"
         options={{
-          title: 'Debat',
-          tabBarActiveTintColor: seasonThemes.spring.accentStrong,
+          href: `/debate?season=${selectedSeason}`,
+          title: debateSpace.label,
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name="chatbubble-ellipses" size={focused ? 28 : 24} color={color} />
+            <SpaceIcon
+              active={focused}
+              activeName={debateSpace.activeIcon}
+              inactiveName={debateSpace.inactiveIcon}
+              color={color}
+            />
           ),
-          tabBarStyle: createTabBarStyle(seasonThemes.spring.tabBar, seasonThemes.spring.border),
         }}
       />
     </Tabs>
