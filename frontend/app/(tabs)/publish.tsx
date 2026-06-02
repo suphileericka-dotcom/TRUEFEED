@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { BrandHeader, Chip, ScreenShell, SeasonSwitcher, SectionLabel } from '@/components/truefeed/ui';
+import {
+  BrandHeader,
+  Chip,
+  ScreenShell,
+  SeasonSwitcher,
+  SectionLabel,
+} from '@/components/truefeed/ui';
 import {
   attachmentOptions,
   fonts,
@@ -20,7 +26,7 @@ export default function PublishScreen() {
   const [format, setFormat] = useState<FormatKey>('vlog');
   const [visibility, setVisibility] = useState('Public');
   const [caption, setCaption] = useState(
-    "Spot prefere du moment, lumiere parfaite et petite astuce budget a partager avec la commu."
+    'Spot prefere du moment, lumiere parfaite et petite astuce budget a partager avec la commu.',
   );
   const [publishState, setPublishState] = useState<PublishState>('idle');
 
@@ -32,10 +38,13 @@ export default function PublishScreen() {
 
       <SectionLabel theme={theme} label="Page publication" />
 
-      <View style={[styles.introCard, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
+      <View
+        style={[styles.introCard, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}
+      >
         <Text style={[styles.introTitle, { color: theme.text }]}>Page prete pour poster</Text>
         <Text style={[styles.introText, { color: theme.muted }]}>
-          Cette interface est deja construite pour brancher ensuite le backend sur `POST /api/posts`.
+          Cette interface est deja construite pour brancher ensuite le backend sur `POST
+          /api/posts`.
         </Text>
       </View>
 
@@ -57,11 +66,15 @@ export default function PublishScreen() {
         })}
       </View>
 
-      <View style={[styles.formCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+      <View
+        style={[styles.formCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+      >
         <Text style={[styles.label, { color: theme.text }]}>Destination</Text>
         <View style={[styles.inlineBlock, { backgroundColor: theme.surfaceAlt }]}>
           <Text style={[styles.inlineMain, { color: theme.text }]}>Kyoto, Japon</Text>
-          <Text style={[styles.inlineMeta, { color: theme.muted }]}>Temple, marche ou carnet de voyage</Text>
+          <Text style={[styles.inlineMeta, { color: theme.muted }]}>
+            Temple, marche ou carnet de voyage
+          </Text>
         </View>
 
         <Text style={[styles.label, { color: theme.text }]}>Legende</Text>
@@ -93,7 +106,8 @@ export default function PublishScreen() {
                   backgroundColor: theme.surfaceAlt,
                   borderColor: theme.border,
                 },
-              ]}>
+              ]}
+            >
               <Text style={styles.attachmentIcon}>{item.icon}</Text>
               <Text style={[styles.attachmentTitle, { color: theme.text }]}>{item.label}</Text>
               <Text style={[styles.attachmentDetail, { color: theme.muted }]}>{item.detail}</Text>
@@ -128,17 +142,29 @@ export default function PublishScreen() {
       <View style={styles.actions}>
         <Pressable
           onPress={() => setPublishState('draft')}
-          style={[styles.secondaryButton, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-          <Text style={[styles.secondaryButtonText, { color: theme.text }]}>Enregistrer brouillon</Text>
+          style={[
+            styles.secondaryButton,
+            { borderColor: theme.border, backgroundColor: theme.surface },
+          ]}
+        >
+          <Text style={[styles.secondaryButtonText, { color: theme.text }]}>
+            Enregistrer brouillon
+          </Text>
         </Pressable>
         <Pressable
           onPress={() => setPublishState('published')}
-          style={[styles.primaryButton, { backgroundColor: theme.text }]}>
+          style={[styles.primaryButton, { backgroundColor: theme.text }]}
+        >
           <Text style={styles.primaryButtonText}>Publier</Text>
         </Pressable>
       </View>
 
-      <View style={[styles.statusCard, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
+      <View
+        style={[
+          styles.statusCard,
+          { backgroundColor: theme.surfaceAlt, borderColor: theme.border },
+        ]}
+      >
         <Text style={[styles.statusTitle, { color: theme.text }]}>
           {publishState === 'idle'
             ? 'Pret a composer'

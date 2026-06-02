@@ -4,12 +4,19 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
-    "dev": "expo start --web --offline",
+    "dev": "node ./scripts/with-env.js development expo start",
+    "dev:web": "node ./scripts/with-env.js development expo start --web --offline",
+    "staging": "node ./scripts/with-env.js staging expo start",
+    "staging:web": "node ./scripts/with-env.js staging expo start --web",
+    "prod": "node ./scripts/with-env.js production expo start",
+    "prod:web": "node ./scripts/with-env.js production expo start --web",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -42,7 +49,9 @@
     "@types/react": "~19.1.0",
     "typescript": "~5.9.2",
     "eslint": "^9.25.0",
-    "eslint-config-expo": "~10.0.0"
+    "eslint-config-expo": "~10.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.6.2"
   },
   "private": true
 }

@@ -161,8 +161,7 @@ export const feedBySeason: Record<
     author: 'nora.nomad',
     location: 'Kyoto, Japon',
     likes: "1 922 j'aime",
-    caption:
-      "Petit matin au Fushimi Inari. Lumiere doree, foule calme et carnet rempli d'idees.",
+    caption: "Petit matin au Fushimi Inari. Lumiere doree, foule calme et carnet rempli d'idees.",
     hint: 'Parfait pour partager un bon plan ou une fiche destination.',
   },
   winter: {
@@ -172,8 +171,7 @@ export const feedBySeason: Record<
     author: 'leo.tracks',
     location: 'Chamonix, France',
     likes: "3 104 j'aime",
-    caption:
-      "Lever a la station, cafe chaud et une premiere trace qui vaut le reveil a 5h20.",
+    caption: 'Lever a la station, cafe chaud et une premiere trace qui vaut le reveil a 5h20.',
     hint: 'Les contenus Explore performent bien avec cartes et spots.',
   },
   spring: {

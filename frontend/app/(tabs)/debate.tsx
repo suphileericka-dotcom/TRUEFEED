@@ -1,6 +1,12 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { BrandHeader, Chip, ProgressBar, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
+import {
+  BrandHeader,
+  Chip,
+  ProgressBar,
+  ScreenShell,
+  SectionLabel,
+} from '@/components/truefeed/ui';
 import { debateTopics, fonts, seasonThemes } from '@/constants/truefeed';
 
 export default function DebateScreen() {
@@ -12,18 +18,25 @@ export default function DebateScreen() {
         theme={theme}
         badgeText="Mode Printemps"
         badgeIcon={theme.emoji}
-        actions={[
-          { icon: 'notifications' },
-          { icon: 'mail' },
-        ]}
+        actions={[{ icon: 'notifications' }, { icon: 'mail' }]}
       />
 
       <SectionLabel theme={theme} label="TrueDebate - Printemps" />
 
       <View style={styles.filters}>
         <Chip label="Debats" icon="💬" backgroundColor={theme.accentStrong} textColor="#FFFFFF" />
-        <Chip label="Montagne" icon="🏔️" backgroundColor={theme.surfaceAlt} textColor={theme.muted} />
-        <Chip label="Culture" icon="🌍" backgroundColor={theme.surfaceAlt} textColor={theme.muted} />
+        <Chip
+          label="Montagne"
+          icon="🏔️"
+          backgroundColor={theme.surfaceAlt}
+          textColor={theme.muted}
+        />
+        <Chip
+          label="Culture"
+          icon="🌍"
+          backgroundColor={theme.surfaceAlt}
+          textColor={theme.muted}
+        />
       </View>
 
       <View style={[styles.heroCard, { backgroundColor: theme.accentStrong }]}>
@@ -43,7 +56,8 @@ export default function DebateScreen() {
               backgroundColor: theme.surface,
               borderColor: theme.border,
             },
-          ]}>
+          ]}
+        >
           <View style={styles.topicTags}>
             {topic.tags.map((tag) => (
               <Chip
@@ -56,11 +70,19 @@ export default function DebateScreen() {
           </View>
           <Text style={[styles.topicTitle, { color: theme.text }]}>{topic.title}</Text>
           <Text style={[styles.topicExcerpt, { color: theme.muted }]}>{topic.excerpt}</Text>
-          <ProgressBar value={topic.percent} color={theme.accentStrong} backgroundColor={theme.border} />
-          <Text style={[styles.voteMeta, { color: theme.muted }]}>{topic.percent}% pour · {100 - topic.percent}% contre</Text>
+          <ProgressBar
+            value={topic.percent}
+            color={theme.accentStrong}
+            backgroundColor={theme.border}
+          />
+          <Text style={[styles.voteMeta, { color: theme.muted }]}>
+            {topic.percent}% pour · {100 - topic.percent}% contre
+          </Text>
           <View style={styles.topicFooter}>
             <Text style={[styles.topicAuthor, { color: theme.text }]}>{topic.author}</Text>
-            <Text style={[styles.topicResponses, { color: theme.accentStrong }]}>{topic.responses}</Text>
+            <Text style={[styles.topicResponses, { color: theme.accentStrong }]}>
+              {topic.responses}
+            </Text>
             <Text style={[styles.topicAge, { color: theme.muted }]}>{topic.age}</Text>
           </View>
         </View>

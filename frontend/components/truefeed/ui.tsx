@@ -1,18 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import type { ComponentProps, ReactNode } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleProp,
-  StyleSheet,
-  Text,
-  View,
-  ViewStyle,
-} from 'react-native';
+import { Pressable, ScrollView, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { fonts, seasonOrder, seasonThemes, type SeasonKey, type SeasonTheme } from '@/constants/truefeed';
+import {
+  fonts,
+  seasonOrder,
+  seasonThemes,
+  type SeasonKey,
+  type SeasonTheme,
+} from '@/constants/truefeed';
 
 type ScreenShellProps = {
   children: ReactNode;
@@ -63,7 +61,8 @@ export function ScreenShell({ children, theme, contentContainerStyle }: ScreenSh
       <StatusBar style={theme.statusBar} />
       <ScrollView
         contentContainerStyle={[styles.content, contentContainerStyle]}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+      >
         {children}
       </ScrollView>
     </SafeAreaView>
@@ -80,7 +79,8 @@ export function BrandHeader({ theme, badgeText, badgeIcon, actions = [] }: Brand
             {
               backgroundColor: theme.accentSoft,
             },
-          ]}>
+          ]}
+        >
           {badgeIcon ? <Text style={styles.badgeIcon}>{badgeIcon}</Text> : null}
           <Text style={[styles.badgeText, { color: theme.accentStrong }]}>{badgeText}</Text>
         </View>
@@ -94,12 +94,9 @@ export function BrandHeader({ theme, badgeText, badgeIcon, actions = [] }: Brand
                 {
                   backgroundColor: theme.surfaceAlt,
                 },
-              ]}>
-              <Ionicons
-                name={action.icon}
-                size={18}
-                color={action.tint ?? theme.accentStrong}
-              />
+              ]}
+            >
+              <Ionicons name={action.icon} size={18} color={action.tint ?? theme.accentStrong} />
             </View>
           ))}
         </View>
@@ -158,7 +155,8 @@ export function SeasonSwitcher({ selectedSeason, onSelect }: SeasonSwitcherProps
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.seasonSwitcher}>
+      contentContainerStyle={styles.seasonSwitcher}
+    >
       {seasonOrder.map((season) => {
         const theme = seasonThemes[season];
         const isActive = selectedSeason === season;

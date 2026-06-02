@@ -3,8 +3,21 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { BrandHeader, Chip, ScreenShell, SeasonSwitcher, SectionLabel } from '@/components/truefeed/ui';
-import { feedBySeason, fonts, getSeasonFromDate, seasonThemes, storyUsers, type SeasonKey } from '@/constants/truefeed';
+import {
+  BrandHeader,
+  Chip,
+  ScreenShell,
+  SeasonSwitcher,
+  SectionLabel,
+} from '@/components/truefeed/ui';
+import {
+  feedBySeason,
+  fonts,
+  getSeasonFromDate,
+  seasonThemes,
+  storyUsers,
+  type SeasonKey,
+} from '@/constants/truefeed';
 
 export default function HomeScreen() {
   const [selectedSeason, setSelectedSeason] = useState<SeasonKey>(getSeasonFromDate());
@@ -17,10 +30,7 @@ export default function HomeScreen() {
         theme={theme}
         badgeText={feed.chip}
         badgeIcon={theme.emoji}
-        actions={[
-          { icon: 'notifications' },
-          { icon: 'mail' },
-        ]}
+        actions={[{ icon: 'notifications' }, { icon: 'mail' }]}
       />
 
       <SeasonSwitcher selectedSeason={selectedSeason} onSelect={setSelectedSeason} />
@@ -51,7 +61,8 @@ export default function HomeScreen() {
             backgroundColor: theme.surface,
             borderColor: theme.border,
           },
-        ]}>
+        ]}
+      >
         <View style={styles.postHeader}>
           <View>
             <Text style={[styles.authorName, { color: theme.text }]}>{feed.author}</Text>
@@ -66,7 +77,8 @@ export default function HomeScreen() {
             {
               backgroundColor: theme.accentStrong,
             },
-          ]}>
+          ]}
+        >
           <Chip
             label={feed.visualTag}
             backgroundColor="rgba(255,255,255,0.22)"
@@ -103,7 +115,8 @@ export default function HomeScreen() {
               {
                 backgroundColor: theme.text,
               },
-            ]}>
+            ]}
+          >
             <Text style={styles.quickPostText}>Poster</Text>
           </Pressable>
         </View>
@@ -116,7 +129,8 @@ export default function HomeScreen() {
             backgroundColor: theme.surfaceAlt,
             borderColor: theme.border,
           },
-        ]}>
+        ]}
+      >
         <Text style={[styles.noteTitle, { color: theme.text }]}>SeasonMode actif</Text>
         <Text style={[styles.noteText, { color: theme.muted }]}>
           Le theme detecte la saison du telephone par defaut, puis tu peux le changer pour

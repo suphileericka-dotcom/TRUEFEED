@@ -26,7 +26,8 @@ export default function TabLayout() {
         tabBarHideOnKeyboard: true,
         tabBarInactiveTintColor: '#9C91B3',
         tabBarShowLabel: false,
-      }}>
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{

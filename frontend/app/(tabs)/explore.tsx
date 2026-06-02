@@ -21,7 +21,9 @@ export default function ExploreScreen() {
 
       <SectionLabel theme={theme} label="Explore - Hiver" />
 
-      <View style={[styles.searchBar, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
+      <View
+        style={[styles.searchBar, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}
+      >
         <Ionicons name="search" size={20} color={theme.muted} />
         <Text style={[styles.searchText, { color: theme.muted }]}>Explorer une destination...</Text>
       </View>
@@ -48,7 +50,8 @@ export default function ExploreScreen() {
                 backgroundColor: spot.tone,
                 height: index === 0 || index === 3 ? 250 : 190,
               },
-            ]}>
+            ]}
+          >
             <Text style={styles.spotIcon}>{spot.icon}</Text>
             <Text style={styles.spotName}>{spot.name}</Text>
             <Text style={styles.spotPosts}>{spot.posts}</Text>

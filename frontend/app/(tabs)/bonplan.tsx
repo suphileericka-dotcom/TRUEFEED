@@ -17,7 +17,8 @@ export default function BonPlanScreen() {
           {
             backgroundColor: theme.accentStrong,
           },
-        ]}>
+        ]}
+      >
         <View style={styles.heroTop}>
           <View style={[styles.heroIconBubble, { backgroundColor: 'rgba(60, 28, 14, 0.26)' }]}>
             <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
@@ -47,10 +48,23 @@ export default function BonPlanScreen() {
             backgroundColor: theme.surface,
             borderColor: theme.border,
           },
-        ]}>
-        <MetricBlock themeColor={theme.accentStrong} label="Note" value={destinationSpotlight.rating} />
-        <MetricBlock themeColor={theme.accentStrong} label="Posts" value={destinationSpotlight.posts} />
-        <MetricBlock themeColor={theme.accentStrong} label="BonPlans" value={destinationSpotlight.plans} />
+        ]}
+      >
+        <MetricBlock
+          themeColor={theme.accentStrong}
+          label="Note"
+          value={destinationSpotlight.rating}
+        />
+        <MetricBlock
+          themeColor={theme.accentStrong}
+          label="Posts"
+          value={destinationSpotlight.posts}
+        />
+        <MetricBlock
+          themeColor={theme.accentStrong}
+          label="BonPlans"
+          value={destinationSpotlight.plans}
+        />
       </View>
 
       <View
@@ -60,7 +74,8 @@ export default function BonPlanScreen() {
             backgroundColor: theme.surfaceAlt,
             borderLeftColor: theme.accentStrong,
           },
-        ]}>
+        ]}
+      >
         <Text style={[styles.tipLabel, { color: theme.accentStrong }]}>Conseil automne</Text>
         <Text style={[styles.tipText, { color: theme.text }]}>{destinationSpotlight.tip}</Text>
       </View>
@@ -76,7 +91,8 @@ export default function BonPlanScreen() {
               backgroundColor: theme.surface,
               borderColor: theme.border,
             },
-          ]}>
+          ]}
+        >
           <View style={styles.nearbyLeft}>
             <Text style={styles.nearbyIcon}>{spot.icon}</Text>
             <View>
@@ -93,7 +109,15 @@ export default function BonPlanScreen() {
   );
 }
 
-function MetricBlock({ label, value, themeColor }: { label: string; value: string; themeColor: string }) {
+function MetricBlock({
+  label,
+  value,
+  themeColor,
+}: {
+  label: string;
+  value: string;
+  themeColor: string;
+}) {
   return (
     <View style={styles.metricBlock}>
       <Text style={[styles.metricValue, { color: themeColor }]}>{value}</Text>

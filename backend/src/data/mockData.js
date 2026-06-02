@@ -4,7 +4,7 @@ const feed = [
     author: 'maya_explores',
     location: 'Santorin, Grece',
     caption:
-      "Le coucher de soleil le plus dingue de ma vie. Oia a 19h, baguette locale et vue sur la caldeira.",
+      'Le coucher de soleil le plus dingue de ma vie. Oia a 19h, baguette locale et vue sur la caldeira.',
     format: 'vlog',
     season: 'summer',
     likes: 2847,
