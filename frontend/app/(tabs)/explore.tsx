@@ -1,18 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
-import {
-  BrandHeader,
-  Chip,
-  ScreenShell,
-  SeasonSwitcher,
-  SectionLabel,
-} from '@/components/truefeed/ui';
+import { BrandHeader, Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { exploreCategories, fonts, seasonThemes, winterSpots } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 
 export default function ExploreScreen() {
-  const { selectedSeason, setSelectedSeason } = useGlobalSeason();
+  const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
 
   return (
@@ -23,8 +17,6 @@ export default function ExploreScreen() {
         badgeIcon={theme.emoji}
         actions={[{ icon: 'notifications' }, { icon: 'mail' }]}
       />
-
-      <SeasonSwitcher selectedSeason={selectedSeason} onSelect={setSelectedSeason} />
 
       <SectionLabel theme={theme} label={`Explore - ${theme.label}`} />
 

@@ -1,27 +1,33 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo } from 'react';
+import { createContext, createElement, useContext, useState, type ReactNode } from 'react';
 
-import { getSeasonFromDate, seasonOrder, type SeasonKey } from '@/constants/truefeed';
+import { getSeasonFromDate, type SeasonKey } from '@/constants/truefeed';
 
-function isSeasonKey(value: unknown): value is SeasonKey {
-  return typeof value === 'string' && seasonOrder.includes(value as SeasonKey);
+type GlobalSeasonContextValue = {
+  selectedSeason: SeasonKey;
+  setSelectedSeason: (season: SeasonKey) => void;
+};
+
+const GlobalSeasonContext = createContext<GlobalSeasonContextValue | null>(null);
+
+export function GlobalSeasonProvider({ children }: { children: ReactNode }) {
+  const [selectedSeason, setSelectedSeason] = useState<SeasonKey>(getSeasonFromDate());
+
+  return createElement(
+    GlobalSeasonContext.Provider,
+    { value: { selectedSeason, setSelectedSeason } },
+    children,
+  );
 }
 
 export function useGlobalSeason() {
-  const params = useLocalSearchParams<{ season?: string | string[] }>();
+  const context = useContext(GlobalSeasonContext);
 
-  const selectedSeason = useMemo<SeasonKey>(() => {
-    const seasonParam = Array.isArray(params.season) ? params.season[0] : params.season;
-
-    return isSeasonKey(seasonParam) ? seasonParam : getSeasonFromDate();
-  }, [params.season]);
-
-  function setSelectedSeason(season: SeasonKey) {
-    router.setParams({ season });
+  if (!context) {
+    return {
+      selectedSeason: getSeasonFromDate(),
+      setSelectedSeason: () => undefined,
+    };
   }
 
-  return {
-    selectedSeason,
-    setSelectedSeason,
-  };
+  return context;
 }

@@ -1,18 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Chip, ScreenShell, SeasonSwitcher, SectionLabel } from '@/components/truefeed/ui';
+import { Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { destinationSpotlight, fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 
 export default function BonPlanScreen() {
-  const { selectedSeason, setSelectedSeason } = useGlobalSeason();
+  const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
 
   return (
     <ScreenShell theme={theme}>
-      <SeasonSwitcher selectedSeason={selectedSeason} onSelect={setSelectedSeason} />
-
       <SectionLabel theme={theme} label={`Fiche destination - ${theme.label}`} />
 
       <View
@@ -80,9 +78,7 @@ export default function BonPlanScreen() {
           },
         ]}
       >
-        <Text style={[styles.tipLabel, { color: theme.accentStrong }]}>
-          Conseil {theme.label}
-        </Text>
+        <Text style={[styles.tipLabel, { color: theme.accentStrong }]}>Conseil {theme.label}</Text>
         <Text style={[styles.tipText, { color: theme.text }]}>{destinationSpotlight.tip}</Text>
       </View>
 

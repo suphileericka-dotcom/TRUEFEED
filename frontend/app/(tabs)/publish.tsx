@@ -2,13 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import {
-  BrandHeader,
-  Chip,
-  ScreenShell,
-  SeasonSwitcher,
-  SectionLabel,
-} from '@/components/truefeed/ui';
+import { BrandHeader, Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import {
   attachmentOptions,
   fonts,
@@ -25,7 +19,7 @@ type MediaKey = (typeof publishMediaOptions)[number]['key'];
 type PublishState = 'idle' | 'draft' | 'published';
 
 export default function PublishScreen() {
-  const { selectedSeason, setSelectedSeason } = useGlobalSeason();
+  const { selectedSeason } = useGlobalSeason();
   const [format, setFormat] = useState<FormatKey>('vlog');
   const [mediaType, setMediaType] = useState<MediaKey>('video');
   const [visibility, setVisibility] = useState('Public');
@@ -107,8 +101,6 @@ export default function PublishScreen() {
           })}
         </View>
       </View>
-
-      <SeasonSwitcher selectedSeason={selectedSeason} onSelect={setSelectedSeason} />
 
       <View style={styles.formatRow}>
         {postFormats.map((item) => {

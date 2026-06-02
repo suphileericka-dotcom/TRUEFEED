@@ -5,14 +5,13 @@ import {
   Chip,
   ProgressBar,
   ScreenShell,
-  SeasonSwitcher,
   SectionLabel,
 } from '@/components/truefeed/ui';
 import { debateTopics, fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 
 export default function DebateScreen() {
-  const { selectedSeason, setSelectedSeason } = useGlobalSeason();
+  const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
 
   return (
@@ -23,8 +22,6 @@ export default function DebateScreen() {
         badgeIcon={theme.emoji}
         actions={[{ icon: 'notifications' }, { icon: 'mail' }]}
       />
-
-      <SeasonSwitcher selectedSeason={selectedSeason} onSelect={setSelectedSeason} />
 
       <SectionLabel theme={theme} label={`TrueDebate - ${theme.label}`} />
 

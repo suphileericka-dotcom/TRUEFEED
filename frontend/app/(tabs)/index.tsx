@@ -10,12 +10,7 @@ import {
   SectionLabel,
   StatePanel,
 } from '@/components/truefeed/ui';
-import {
-  feedBySeason,
-  fonts,
-  seasonThemes,
-  storyUsers,
-} from '@/constants/truefeed';
+import { feedBySeason, fonts, seasonThemes, storyUsers } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 
 export default function HomeScreen() {
@@ -137,7 +132,7 @@ export default function HomeScreen() {
             textColor={theme.accentStrong}
           />
           <Pressable
-            onPress={() => router.push(`/publish?season=${selectedSeason}`)}
+            onPress={() => router.push('/publish')}
             style={[
               styles.quickPostButton,
               {
