@@ -2,7 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { BrandHeader, Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
+import {
+  BrandHeader,
+  Chip,
+  MediaSelector,
+  ScreenShell,
+  SeasonalTag,
+  SectionLabel,
+  TruefeedModal,
+} from '@/components/truefeed/ui';
 import {
   attachmentOptions,
   fonts,
@@ -30,6 +38,7 @@ export default function PublishScreen() {
   );
   const [selectedTags, setSelectedTags] = useState<string[]>(['ville', 'food']);
   const [publishState, setPublishState] = useState<PublishState>('idle');
+  const [showPublishModal, setShowPublishModal] = useState(false);
 
   const theme = seasonThemes[selectedSeason];
   const tags = seasonalTags[selectedSeason];
@@ -71,35 +80,12 @@ export default function PublishScreen() {
           </Text>
         </View>
 
-        <View style={styles.mediaOptions}>
-          {publishMediaOptions.map((item) => {
-            const isActive = mediaType === item.key;
-            return (
-              <Pressable
-                key={item.key}
-                onPress={() => setMediaType(item.key)}
-                style={[
-                  styles.mediaOption,
-                  { backgroundColor: isActive ? '#FFFFFF' : 'rgba(255,255,255,0.18)' },
-                ]}
-              >
-                <Ionicons
-                  name={item.icon}
-                  size={18}
-                  color={isActive ? theme.accentStrong : '#FFFFFF'}
-                />
-                <Text
-                  style={[
-                    styles.mediaOptionText,
-                    { color: isActive ? theme.accentStrong : '#FFFFFF' },
-                  ]}
-                >
-                  {item.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <MediaSelector
+          options={publishMediaOptions}
+          selectedKey={mediaType}
+          theme={theme}
+          onSelect={setMediaType}
+        />
       </View>
 
       <View style={styles.formatRow}>
@@ -176,12 +162,11 @@ export default function PublishScreen() {
           {tags.map((tag) => {
             const isActive = selectedTags.includes(tag);
             return (
-              <Chip
+              <SeasonalTag
                 key={tag}
-                label={`#${tag}`}
+                label={tag}
+                theme={theme}
                 active={isActive}
-                backgroundColor={isActive ? theme.accentSoft : theme.surfaceAlt}
-                textColor={isActive ? theme.accentStrong : theme.muted}
                 onPress={() => toggleTag(tag)}
               />
             );
@@ -255,7 +240,7 @@ export default function PublishScreen() {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => setPublishState('published')}
+          onPress={() => setShowPublishModal(true)}
           style={[styles.primaryButton, { backgroundColor: theme.text }]}
         >
           <Text style={styles.primaryButtonText}>Publier</Text>
@@ -283,6 +268,20 @@ export default function PublishScreen() {
               : 'La route `POST /api/posts` cote backend est deja presente pour la suite.'}
         </Text>
       </View>
+
+      <TruefeedModal
+        visible={showPublishModal}
+        theme={theme}
+        title="Publier ce post ?"
+        message="Le post gardera le theme global choisi sur l'accueil et les tags saisonniers selectionnes."
+        secondaryLabel="Annuler"
+        primaryLabel="Publier"
+        onClose={() => setShowPublishModal(false)}
+        onPrimary={() => {
+          setPublishState('published');
+          setShowPublishModal(false);
+        }}
+      />
     </ScreenShell>
   );
 }
@@ -332,24 +331,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: fonts.body,
     fontSize: 15,
-    fontWeight: '800',
-  },
-  mediaOptions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  mediaOption: {
-    alignItems: 'center',
-    borderRadius: 999,
-    flex: 1,
-    flexDirection: 'row',
-    gap: 6,
-    justifyContent: 'center',
-    paddingVertical: 11,
-  },
-  mediaOptionText: {
-    fontFamily: fonts.body,
-    fontSize: 13,
     fontWeight: '800',
   },
   formatRow: {

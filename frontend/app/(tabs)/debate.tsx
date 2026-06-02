@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
   BrandHeader,
@@ -13,6 +14,8 @@ import { useGlobalSeason } from '@/hooks/use-global-season';
 export default function DebateScreen() {
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
+  const [selectedTopic, setSelectedTopic] = useState(debateTopics[0]);
+  const [reply, setReply] = useState('');
 
   return (
     <ScreenShell theme={theme}>
@@ -26,153 +29,104 @@ export default function DebateScreen() {
       <SectionLabel theme={theme} label={`TrueDebate - ${theme.label}`} />
 
       <View style={styles.filters}>
-        <Chip label="Debats" icon="💬" backgroundColor={theme.accentStrong} textColor="#FFFFFF" />
-        <Chip
-          label="Montagne"
-          icon="🏔️"
-          backgroundColor={theme.surfaceAlt}
-          textColor={theme.muted}
-        />
-        <Chip
-          label="Culture"
-          icon="🌍"
-          backgroundColor={theme.surfaceAlt}
-          textColor={theme.muted}
-        />
+        <Chip label="Tendances" backgroundColor={theme.accentStrong} textColor="#FFFFFF" />
+        <Chip label="Recents" backgroundColor={theme.surfaceAlt} textColor={theme.muted} />
+        <Chip label="Mes votes" backgroundColor={theme.surfaceAlt} textColor={theme.muted} />
       </View>
 
-      <View style={[styles.heroCard, { backgroundColor: theme.accentStrong }]}>
-        <Text style={styles.heroEyebrow}>Topic {theme.label}</Text>
-        <Text style={styles.heroTitle}>Le Japon en Hanami : surestime ou incontournable ?</Text>
-        <View style={styles.heroButton}>
-          <Text style={styles.heroButtonText}>Rejoindre le debat</Text>
+      {debateTopics.map((topic) => {
+        const active = selectedTopic.title === topic.title;
+        return (
+          <Pressable
+            key={topic.title}
+            onPress={() => setSelectedTopic(topic)}
+            style={[
+              styles.topicCard,
+              {
+                backgroundColor: active ? theme.accentSoft : theme.surface,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            <View style={styles.topicTags}>
+              {topic.tags.map((tag) => (
+                <Chip
+                  key={tag}
+                  label={tag}
+                  backgroundColor={theme.surfaceAlt}
+                  textColor={theme.accentStrong}
+                />
+              ))}
+            </View>
+            <Text style={[styles.topicTitle, { color: theme.text }]}>{topic.title}</Text>
+            <Text style={[styles.topicExcerpt, { color: theme.muted }]}>{topic.excerpt}</Text>
+          </Pressable>
+        );
+      })}
+
+      <View
+        style={[styles.threadCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+      >
+        <Text style={[styles.threadTitle, { color: theme.text }]}>{selectedTopic.title}</Text>
+        <Text style={[styles.threadBody, { color: theme.muted }]}>{selectedTopic.excerpt}</Text>
+        <ProgressBar
+          value={selectedTopic.percent}
+          color={theme.accentStrong}
+          backgroundColor={theme.border}
+        />
+        <Text style={[styles.voteMeta, { color: theme.muted }]}>
+          {selectedTopic.percent}% pour · {100 - selectedTopic.percent}% contre
+        </Text>
+        <View style={styles.voteRow}>
+          <Pressable style={[styles.voteButton, { backgroundColor: theme.accentStrong }]}>
+            <Text style={styles.voteText}>Pour</Text>
+          </Pressable>
+          <Pressable style={[styles.voteButton, { backgroundColor: theme.text }]}>
+            <Text style={styles.voteText}>Contre</Text>
+          </Pressable>
         </View>
       </View>
 
-      {debateTopics.map((topic) => (
-        <View
-          key={topic.title}
-          style={[
-            styles.topicCard,
-            {
-              backgroundColor: theme.surface,
-              borderColor: theme.border,
-            },
-          ]}
-        >
-          <View style={styles.topicTags}>
-            {topic.tags.map((tag) => (
-              <Chip
-                key={tag}
-                label={tag}
-                backgroundColor={theme.surfaceAlt}
-                textColor={theme.accentStrong}
-              />
-            ))}
-          </View>
-          <Text style={[styles.topicTitle, { color: theme.text }]}>{topic.title}</Text>
-          <Text style={[styles.topicExcerpt, { color: theme.muted }]}>{topic.excerpt}</Text>
-          <ProgressBar
-            value={topic.percent}
-            color={theme.accentStrong}
-            backgroundColor={theme.border}
-          />
-          <Text style={[styles.voteMeta, { color: theme.muted }]}>
-            {topic.percent}% pour · {100 - topic.percent}% contre
-          </Text>
-          <View style={styles.topicFooter}>
-            <Text style={[styles.topicAuthor, { color: theme.text }]}>{topic.author}</Text>
-            <Text style={[styles.topicResponses, { color: theme.accentStrong }]}>
-              {topic.responses}
-            </Text>
-            <Text style={[styles.topicAge, { color: theme.muted }]}>{topic.age}</Text>
-          </View>
-        </View>
-      ))}
+      <View
+        style={[styles.composer, { backgroundColor: theme.surface, borderColor: theme.border }]}
+      >
+        <TextInput
+          multiline
+          onChangeText={setReply}
+          placeholder="Repondre au thread..."
+          placeholderTextColor={theme.muted}
+          style={[styles.replyInput, { color: theme.text }]}
+          value={reply}
+        />
+        <Pressable style={[styles.sendButton, { backgroundColor: theme.accentStrong }]}>
+          <Text style={styles.sendText}>Envoyer</Text>
+        </Pressable>
+      </View>
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  filters: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  heroCard: {
-    borderRadius: 32,
-    gap: 18,
-    padding: 24,
-  },
-  heroEyebrow: {
-    color: '#D7F4DD',
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-  },
-  heroTitle: {
-    color: '#FFFFFF',
-    fontFamily: fonts.title,
-    fontSize: 34,
-    fontWeight: '700',
-    lineHeight: 42,
-  },
-  heroButton: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#7AC38F',
+  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  topicCard: { borderRadius: 24, borderWidth: 1, gap: 12, padding: 16 },
+  topicTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  topicTitle: { fontFamily: fonts.title, fontSize: 24, fontWeight: '700', lineHeight: 31 },
+  topicExcerpt: { fontFamily: fonts.body, fontSize: 15, lineHeight: 23 },
+  threadCard: { borderRadius: 28, borderWidth: 1, gap: 14, padding: 20 },
+  threadTitle: { fontFamily: fonts.title, fontSize: 30, fontWeight: '700', lineHeight: 38 },
+  threadBody: { fontFamily: fonts.body, fontSize: 16, lineHeight: 25 },
+  voteMeta: { fontFamily: fonts.body, fontSize: 14, fontWeight: '800' },
+  voteRow: { flexDirection: 'row', gap: 10 },
+  voteButton: { alignItems: 'center', borderRadius: 16, flex: 1, paddingVertical: 13 },
+  voteText: { color: '#FFFFFF', fontFamily: fonts.body, fontSize: 14, fontWeight: '800' },
+  composer: { borderRadius: 24, borderWidth: 1, gap: 12, padding: 16 },
+  replyInput: { fontFamily: fonts.body, fontSize: 15, minHeight: 82, textAlignVertical: 'top' },
+  sendButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-end',
     borderRadius: 999,
     paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingVertical: 11,
   },
-  heroButtonText: {
-    color: '#FFFFFF',
-    fontFamily: fonts.body,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  topicCard: {
-    borderRadius: 28,
-    borderWidth: 1,
-    gap: 16,
-    padding: 20,
-  },
-  topicTags: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  topicTitle: {
-    fontFamily: fonts.title,
-    fontSize: 28,
-    fontWeight: '700',
-    lineHeight: 36,
-  },
-  topicExcerpt: {
-    fontFamily: fonts.body,
-    fontSize: 16,
-    lineHeight: 26,
-  },
-  voteMeta: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-  },
-  topicFooter: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  topicAuthor: {
-    fontFamily: fonts.body,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  topicResponses: {
-    fontFamily: fonts.body,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  topicAge: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-  },
+  sendText: { color: '#FFFFFF', fontFamily: fonts.body, fontSize: 14, fontWeight: '800' },
 });

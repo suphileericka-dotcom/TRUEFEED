@@ -8,8 +8,10 @@ const dataSchema = {
       displayName: { type: 'string', required: true },
       avatarUrl: { type: 'string', required: false },
       bio: { type: 'string', required: false },
+      passwordHash: { type: 'string', required: true, private: true },
       role: { type: 'enum', values: ['user', 'moderator', 'admin'], default: 'user' },
       status: { type: 'enum', values: ['active', 'suspended', 'deleted'], default: 'active' },
+      emailVerifiedAt: { type: 'datetime', required: false },
       lastSeenAt: { type: 'datetime', required: false },
       createdAt: { type: 'datetime', required: true },
       updatedAt: { type: 'datetime', required: true },
@@ -18,6 +20,21 @@ const dataSchema = {
       { name: 'users_username_key', fields: ['lower(username)'], unique: true },
       { name: 'users_email_key', fields: ['lower(email)'], unique: true },
       { name: 'users_status_created_at_idx', fields: ['status', 'createdAt'] },
+    ],
+  },
+  refreshSessions: {
+    description: 'Sessions de refresh token pour renouveler une connexion.',
+    fields: {
+      id: { type: 'string', required: true, unique: true },
+      userId: { type: 'string', required: true, references: 'users.id' },
+      tokenHash: { type: 'string', required: true, unique: true, private: true },
+      expiresAt: { type: 'datetime', required: true },
+      revokedAt: { type: 'datetime', required: false },
+      createdAt: { type: 'datetime', required: true },
+    },
+    indexes: [
+      { name: 'refresh_sessions_token_hash_key', fields: ['tokenHash'], unique: true },
+      { name: 'refresh_sessions_user_expires_at_idx', fields: ['userId', 'expiresAt'] },
     ],
   },
   posts: {
@@ -29,9 +46,13 @@ const dataSchema = {
       caption: { type: 'string', required: true },
       mediaUrl: { type: 'string', required: false },
       mediaType: { type: 'enum', values: ['image', 'video', 'text'], default: 'text' },
+      mediaSizeBytes: { type: 'number', required: false, max: 52428800 },
       format: { type: 'enum', values: ['vlog', 'photo', 'tip', 'debate'], required: true },
       location: { type: 'string', required: false },
       season: { type: 'enum', values: ['spring', 'summer', 'autumn', 'winter'], required: false },
+      likesCount: { type: 'number', required: true, default: 0 },
+      commentsCount: { type: 'number', required: true, default: 0 },
+      sharesCount: { type: 'number', required: true, default: 0 },
       status: {
         type: 'enum',
         values: ['draft', 'published', 'hidden', 'deleted'],
@@ -53,6 +74,11 @@ const dataSchema = {
       {
         name: 'posts_season_date_idx',
         fields: ['season', 'publishedAt'],
+        where: "status = 'published'",
+      },
+      {
+        name: 'posts_trending_idx',
+        fields: ['status', 'likesCount', 'commentsCount', 'sharesCount', 'publishedAt'],
         where: "status = 'published'",
       },
     ],
@@ -87,6 +113,13 @@ const dataSchema = {
       createdAt: { type: 'datetime', required: true },
       updatedAt: { type: 'datetime', required: true },
     },
+    indexes: [
+      {
+        name: 'comments_post_created_at_idx',
+        fields: ['postId', 'createdAt'],
+        where: "status = 'published'",
+      },
+    ],
   },
   likes: {
     description: 'Likes poses par les utilisateurs sur un post ou un commentaire.',
@@ -102,6 +135,7 @@ const dataSchema = {
       ['userId', 'postId'],
       ['userId', 'commentId'],
     ],
+    indexes: [{ name: 'likes_post_created_at_idx', fields: ['postId', 'createdAt'] }],
   },
   reports: {
     description: 'Signalements moderes par un admin ou moderateur.',

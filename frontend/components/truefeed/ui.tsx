@@ -1,7 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import type { ComponentProps, ReactNode } from 'react';
-import { Pressable, ScrollView, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -72,6 +81,39 @@ type SpaceIconProps = {
   inactiveName: ComponentProps<typeof Ionicons>['name'];
   color: string;
   size?: number;
+};
+
+type SeasonalTagProps = {
+  label: string;
+  theme: SeasonTheme;
+  active?: boolean;
+  onPress?: () => void;
+};
+
+type MediaOption = {
+  key: string;
+  label: string;
+  icon: ComponentProps<typeof Ionicons>['name'];
+};
+
+type MediaSelectorProps<T extends MediaOption> = {
+  options: readonly T[];
+  selectedKey: T['key'];
+  theme: SeasonTheme;
+  onSelect: (key: T['key']) => void;
+};
+
+type TruefeedModalProps = {
+  visible: boolean;
+  theme: SeasonTheme;
+  title: string;
+  message?: string;
+  children?: ReactNode;
+  primaryLabel?: string;
+  secondaryLabel?: string;
+  onPrimary?: () => void;
+  onSecondary?: () => void;
+  onClose: () => void;
 };
 
 export function ScreenShell({ children, theme, contentContainerStyle }: ScreenShellProps) {
@@ -252,6 +294,118 @@ export function SpaceIcon({ active, activeName, inactiveName, color, size = 24 }
   );
 }
 
+export function SeasonalTag({ label, theme, active = false, onPress }: SeasonalTagProps) {
+  return (
+    <Chip
+      label={`#${label}`}
+      icon={active ? theme.emoji : undefined}
+      active={active}
+      backgroundColor={active ? theme.accentSoft : theme.surfaceAlt}
+      textColor={active ? theme.accentStrong : theme.muted}
+      onPress={onPress}
+    />
+  );
+}
+
+export function MediaSelector<T extends MediaOption>({
+  options,
+  selectedKey,
+  theme,
+  onSelect,
+}: MediaSelectorProps<T>) {
+  return (
+    <View style={styles.mediaSelector}>
+      {options.map((option) => {
+        const isActive = selectedKey === option.key;
+
+        return (
+          <Pressable
+            key={option.key}
+            onPress={() => onSelect(option.key)}
+            style={[
+              styles.mediaSelectorOption,
+              {
+                backgroundColor: isActive ? '#FFFFFF' : 'rgba(255,255,255,0.18)',
+              },
+            ]}
+          >
+            <Ionicons
+              name={option.icon}
+              size={18}
+              color={isActive ? theme.accentStrong : '#FFFFFF'}
+            />
+            <Text
+              style={[
+                styles.mediaSelectorText,
+                { color: isActive ? theme.accentStrong : '#FFFFFF' },
+              ]}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+export function TruefeedModal({
+  visible,
+  theme,
+  title,
+  message,
+  children,
+  primaryLabel,
+  secondaryLabel,
+  onPrimary,
+  onSecondary,
+  onClose,
+}: TruefeedModalProps) {
+  return (
+    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={[styles.modalCard, { backgroundColor: theme.surface }]}>
+          <View style={styles.modalHeader}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>{title}</Text>
+            <Pressable
+              onPress={onClose}
+              style={[styles.modalClose, { backgroundColor: theme.surfaceAlt }]}
+            >
+              <Ionicons name="close" size={18} color={theme.muted} />
+            </Pressable>
+          </View>
+          {message ? (
+            <Text style={[styles.modalMessage, { color: theme.muted }]}>{message}</Text>
+          ) : null}
+          {children}
+          {primaryLabel || secondaryLabel ? (
+            <View style={styles.modalActions}>
+              {secondaryLabel ? (
+                <Pressable
+                  onPress={onSecondary ?? onClose}
+                  style={[styles.modalSecondary, { borderColor: theme.border }]}
+                >
+                  <Text style={[styles.modalSecondaryText, { color: theme.text }]}>
+                    {secondaryLabel}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {primaryLabel ? (
+                <Pressable
+                  onPress={onPrimary}
+                  style={[styles.modalPrimary, { backgroundColor: theme.accentStrong }]}
+                >
+                  <Text style={styles.modalPrimaryText}>{primaryLabel}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -388,6 +542,89 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: fonts.body,
     fontSize: 13,
+    fontWeight: '800',
+  },
+  mediaSelector: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  mediaSelectorOption: {
+    alignItems: 'center',
+    borderRadius: 999,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    paddingVertical: 11,
+  },
+  mediaSelectorText: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  modalBackdrop: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.54)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    borderRadius: 28,
+    gap: 14,
+    maxWidth: 420,
+    padding: 20,
+    width: '100%',
+  },
+  modalHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalTitle: {
+    flex: 1,
+    fontFamily: fonts.title,
+    fontSize: 28,
+    fontWeight: '700',
+  },
+  modalClose: {
+    alignItems: 'center',
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  modalMessage: {
+    fontFamily: fonts.body,
+    fontSize: 15,
+    lineHeight: 23,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modalSecondary: {
+    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    flex: 1,
+    paddingVertical: 13,
+  },
+  modalSecondaryText: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  modalPrimary: {
+    alignItems: 'center',
+    borderRadius: 16,
+    flex: 1,
+    paddingVertical: 13,
+  },
+  modalPrimaryText: {
+    color: '#FFFFFF',
+    fontFamily: fonts.body,
+    fontSize: 14,
     fontWeight: '800',
   },
 });

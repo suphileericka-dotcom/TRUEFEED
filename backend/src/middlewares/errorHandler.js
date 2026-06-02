@@ -8,6 +8,15 @@ function notFoundHandler(req, res) {
 }
 
 function errorHandler(error, req, res, _next) {
+  if (error.statusCode) {
+    res.status(error.statusCode).json({
+      error: error.error || 'request_error',
+      message: error.message,
+      details: error.details,
+    });
+    return;
+  }
+
   logError('unhandled_error', {
     method: req.method,
     path: req.originalUrl,

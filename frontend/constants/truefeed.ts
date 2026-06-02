@@ -214,6 +214,7 @@ export const winterSpots = [
 
 export const debateTopics = [
   {
+    id: 'thread-light-bag',
     tags: ['HOT', 'Sac a dos'],
     title: 'Voyager avec 7kg max : une liberte ou une contrainte ?',
     excerpt:
@@ -224,6 +225,7 @@ export const debateTopics = [
     age: '2h',
   },
   {
+    id: 'thread-slow-travel',
     tags: ['NOUVEAU', 'Slow travel'],
     title: 'Rester 1 mois vs 4 pays en 15 jours : que choisir ?',
     excerpt:
@@ -234,6 +236,23 @@ export const debateTopics = [
     age: '4h',
   },
 ];
+
+export const publicProfile = {
+  id: 'nora.nomad',
+  username: 'nora.nomad',
+  displayName: 'Nora Nomad',
+  bio: 'BonPlans urbains, marches locaux et carnets Japon.',
+  stats: { posts: '128', followers: '24k', helpful: '91%' },
+  activity: ['A publie un BonPlan Kyoto', 'A commente Hanami debat', 'A sauvegarde Nishiki Market'],
+};
+
+export const mapExplorerPins = [
+  { id: 'fushimi', name: 'Fushimi Inari', category: 'Temple', x: '62%', y: '34%', score: '9.8' },
+  { id: 'nishiki', name: 'Nishiki Market', category: 'Food', x: '45%', y: '58%', score: '9.5' },
+  { id: 'arashiyama', name: 'Arashiyama', category: 'Nature', x: '26%', y: '42%', score: '9.3' },
+];
+
+export const bonPlanCategories = ['Lieu', 'Food', 'Budget', 'Transport', 'Vue'];
 
 export const postFormats = [
   { key: 'photo', label: 'Photo' },

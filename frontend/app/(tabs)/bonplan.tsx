@@ -1,13 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
-import { destinationSpotlight, fonts, seasonThemes } from '@/constants/truefeed';
+import { bonPlanCategories, destinationSpotlight, fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 
 export default function BonPlanScreen() {
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
+  const [planTitle, setPlanTitle] = useState('');
+  const [category, setCategory] = useState(bonPlanCategories[0]);
+  const [budget, setBudget] = useState('');
+  const canSubmit = planTitle.trim().length >= 3 && budget.trim().length >= 1;
 
   return (
     <ScreenShell theme={theme}>
@@ -107,6 +112,48 @@ export default function BonPlanScreen() {
           </View>
         </View>
       ))}
+
+      <View
+        style={[styles.formCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+      >
+        <Text style={[styles.blockTitle, { color: theme.text }]}>Ajouter un bon plan</Text>
+        <TextInput
+          onChangeText={setPlanTitle}
+          placeholder="Nom du spot"
+          placeholderTextColor={theme.muted}
+          style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
+          value={planTitle}
+        />
+        <View style={styles.categoryRow}>
+          {bonPlanCategories.map((item) => (
+            <Chip
+              key={item}
+              label={item}
+              active={category === item}
+              backgroundColor={category === item ? theme.accentSoft : theme.surfaceAlt}
+              textColor={category === item ? theme.accentStrong : theme.muted}
+              onPress={() => setCategory(item)}
+            />
+          ))}
+        </View>
+        <TextInput
+          onChangeText={setBudget}
+          placeholder="Budget estime, ex: 12 EUR"
+          placeholderTextColor={theme.muted}
+          style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
+          value={budget}
+        />
+        <Pressable
+          style={[
+            styles.submitButton,
+            { backgroundColor: canSubmit ? theme.accentStrong : theme.border },
+          ]}
+        >
+          <Text style={styles.submitText}>
+            {canSubmit ? 'Proposer le bon plan' : 'Complete le formulaire'}
+          </Text>
+        </Pressable>
+      </View>
     </ScreenShell>
   );
 }
@@ -243,6 +290,34 @@ const styles = StyleSheet.create({
   scoreText: {
     fontFamily: fonts.body,
     fontSize: 16,
+    fontWeight: '800',
+  },
+  formCard: {
+    borderRadius: 28,
+    borderWidth: 1,
+    gap: 14,
+    padding: 18,
+  },
+  input: {
+    borderRadius: 18,
+    fontFamily: fonts.body,
+    fontSize: 16,
+    padding: 15,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  submitButton: {
+    alignItems: 'center',
+    borderRadius: 18,
+    paddingVertical: 15,
+  },
+  submitText: {
+    color: '#FFFFFF',
+    fontFamily: fonts.body,
+    fontSize: 15,
     fontWeight: '800',
   },
 });

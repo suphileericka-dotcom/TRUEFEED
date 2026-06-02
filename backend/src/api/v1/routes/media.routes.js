@@ -1,13 +1,17 @@
 const express = require('express');
 
-const { resolvers } = require('../resolvers');
+const { mediaService } = require('../../../services/media.service');
 
 const mediaV1Router = express.Router();
 
-mediaV1Router.post('/presign', (req, res) => {
-  const result = resolvers.media.createPresignedUpload(req.body ?? {});
+mediaV1Router.post('/presign', (req, res, next) => {
+  try {
+    const upload = mediaService.createPresignedUpload(req.body ?? {});
 
-  res.status(result.ok ? 201 : 400).json(result);
+    res.status(201).json({ upload });
+  } catch (error) {
+    next(error);
+  }
 });
 
 mediaV1Router.post('/complete', (req, res) => {

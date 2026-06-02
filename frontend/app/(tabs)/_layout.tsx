@@ -4,7 +4,7 @@ import React from 'react';
 import { HapticTab } from '@/components/haptic-tab';
 import { SpaceIcon } from '@/components/truefeed/ui';
 import { seasonThemes, truefeedSpaces, type TruefeedSpaceKey } from '@/constants/truefeed';
-import { GlobalSeasonProvider, useGlobalSeason } from '@/hooks/use-global-season';
+import { useGlobalSeason } from '@/hooks/use-global-season';
 
 function createTabBarStyle(backgroundColor: string, borderColor: string) {
   return {
@@ -23,14 +23,6 @@ function getSpace(key: TruefeedSpaceKey) {
 }
 
 export default function TabLayout() {
-  return (
-    <GlobalSeasonProvider>
-      <ThemedTabs />
-    </GlobalSeasonProvider>
-  );
-}
-
-function ThemedTabs() {
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
   const feedSpace = getSpace('feed');
