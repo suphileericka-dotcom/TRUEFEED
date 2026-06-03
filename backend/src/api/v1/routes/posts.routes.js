@@ -21,9 +21,9 @@ const commentSchema = {
   content: { type: 'string', required: true, minLength: 2, maxLength: 800 },
 };
 
-postsV1Router.get('/feed', (req, res, next) => {
+postsV1Router.get('/feed', async (req, res, next) => {
   try {
-    const feed = postsService.listFeed({
+    const feed = await postsService.listFeed({
       cursor: req.query.cursor,
       limit: req.query.limit,
       sort: req.query.sort,
@@ -35,10 +35,10 @@ postsV1Router.get('/feed', (req, res, next) => {
   }
 });
 
-postsV1Router.post('/', requireAuth, (req, res, next) => {
+postsV1Router.post('/', requireAuth, async (req, res, next) => {
   try {
     const payload = validate(createPostSchema, req.body);
-    const post = postsService.createPost(
+    const post = await postsService.createPost(
       {
         ...payload,
         tags: Array.isArray(req.body.tags) ? req.body.tags : [],
@@ -54,10 +54,10 @@ postsV1Router.post('/', requireAuth, (req, res, next) => {
   }
 });
 
-postsV1Router.get('/:postId', (req, res, next) => {
+postsV1Router.get('/:postId', async (req, res, next) => {
   try {
-    const post = postsService.getPost(req.params.postId);
-    const comments = postsService.listComments(req.params.postId);
+    const post = await postsService.getPost(req.params.postId);
+    const comments = await postsService.listComments(req.params.postId);
 
     res.json({ post, comments });
   } catch (error) {
@@ -65,20 +65,20 @@ postsV1Router.get('/:postId', (req, res, next) => {
   }
 });
 
-postsV1Router.get('/:postId/comments', (req, res, next) => {
+postsV1Router.get('/:postId/comments', async (req, res, next) => {
   try {
     res.json({
-      items: postsService.listComments(req.params.postId),
+      items: await postsService.listComments(req.params.postId),
     });
   } catch (error) {
     next(error);
   }
 });
 
-postsV1Router.post('/:postId/comments', requireAuth, (req, res, next) => {
+postsV1Router.post('/:postId/comments', requireAuth, async (req, res, next) => {
   try {
     const payload = validate(commentSchema, req.body);
-    const comment = postsService.addComment(req.params.postId, payload, req.user);
+    const comment = await postsService.addComment(req.params.postId, payload, req.user);
 
     analyticsService.track('comment_create', {
       postId: req.params.postId,
@@ -91,9 +91,9 @@ postsV1Router.post('/:postId/comments', requireAuth, (req, res, next) => {
   }
 });
 
-postsV1Router.post('/:postId/like', requireAuth, (req, res, next) => {
+postsV1Router.post('/:postId/like', requireAuth, async (req, res, next) => {
   try {
-    const result = postsService.toggleLike(req.params.postId, req.user);
+    const result = await postsService.toggleLike(req.params.postId, req.user);
 
     analyticsService.track('like_toggle', {
       postId: req.params.postId,
@@ -106,9 +106,9 @@ postsV1Router.post('/:postId/like', requireAuth, (req, res, next) => {
   }
 });
 
-postsV1Router.post('/:postId/share', (req, res, next) => {
+postsV1Router.post('/:postId/share', async (req, res, next) => {
   try {
-    const result = postsService.sharePost(req.params.postId);
+    const result = await postsService.sharePost(req.params.postId, req.user);
 
     analyticsService.track('share', { postId: req.params.postId });
     res.json(result);

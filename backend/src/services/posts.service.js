@@ -1,3 +1,4 @@
+const { query, transaction } = require('../data/db');
 const { createHttpError } = require('../utils/httpError');
 
 const allowedMediaTypes = ['image', 'video', 'text'];
@@ -23,88 +24,10 @@ const allowedTags = new Set([
 const maxMediaSizeBytes = 50 * 1024 * 1024;
 const pageSizeDefault = 8;
 const pageSizeMax = 20;
-
-const posts = new Map();
-const comments = new Map();
-const likes = new Map();
 const postAttemptsByUser = new Map();
 const commentAttemptsByUser = new Map();
 const feedCache = new Map();
-let seeded = false;
-
-function createId(prefix) {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function seedPosts() {
-  if (seeded) {
-    return;
-  }
-
-  seeded = true;
-
-  const now = Date.now();
-  [
-    {
-      authorId: 'seed_maya',
-      author: 'maya_explores',
-      title: 'Oia au coucher du soleil',
-      caption: 'Snack local, lumiere folle et spot calme juste avant la foule.',
-      mediaType: 'video',
-      mediaUrl: 'https://example.com/oia.mp4',
-      mediaSizeBytes: 18 * 1024 * 1024,
-      format: 'vlog',
-      location: 'Santorin, Grece',
-      season: 'summer',
-      tags: ['soleil', 'plage', 'budget'],
-      likesCount: 2847,
-      commentsCount: 42,
-      sharesCount: 18,
-      createdAt: new Date(now - 1000 * 60 * 12).toISOString(),
-    },
-    {
-      authorId: 'seed_nora',
-      author: 'nora.nomad',
-      title: 'Matin au Fushimi Inari',
-      caption: 'Arriver a 6h change tout: lumiere douce, allees calmes, budget zero.',
-      mediaType: 'image',
-      mediaUrl: 'https://example.com/kyoto.jpg',
-      mediaSizeBytes: 4 * 1024 * 1024,
-      format: 'tip',
-      location: 'Kyoto, Japon',
-      season: 'autumn',
-      tags: ['ville', 'marche', 'food'],
-      likesCount: 1922,
-      commentsCount: 31,
-      sharesCount: 12,
-      createdAt: new Date(now - 1000 * 60 * 90).toISOString(),
-    },
-    {
-      authorId: 'seed_sophie',
-      author: 'sophie_bpkt',
-      title: 'Hanami: incontournable ou trop touristique ?',
-      caption: 'Joli debat ouvert apres une soiree sous les cerisiers.',
-      mediaType: 'text',
-      format: 'debate',
-      location: 'Tokyo, Japon',
-      season: 'spring',
-      tags: ['hanami', 'culture', 'slowtravel'],
-      likesCount: 1488,
-      commentsCount: 96,
-      sharesCount: 27,
-      createdAt: new Date(now - 1000 * 60 * 180).toISOString(),
-    },
-  ].forEach((post) => {
-    const id = createId('post');
-    posts.set(id, {
-      id,
-      status: 'published',
-      publishedAt: post.createdAt,
-      updatedAt: post.createdAt,
-      ...post,
-    });
-  });
-}
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function invalidateFeedCache() {
   feedCache.clear();
@@ -161,8 +84,18 @@ function validateMedia(payload) {
   }
 }
 
+function assertUuid(value, field = 'id') {
+  if (!uuidPattern.test(String(value))) {
+    throw createHttpError(400, 'invalid_id', `${field} invalide.`);
+  }
+}
+
+function toIso(value) {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
 function toCursor(post) {
-  return Buffer.from(`${post.createdAt}|${post.id}`).toString('base64url');
+  return Buffer.from(`${post.publishedAt}|${post.id}`).toString('base64url');
 }
 
 function fromCursor(cursor) {
@@ -171,21 +104,73 @@ function fromCursor(cursor) {
   }
 
   try {
-    const [createdAt, id] = Buffer.from(cursor, 'base64url').toString('utf8').split('|');
-    return { createdAt, id };
+    const [publishedAt, id] = Buffer.from(cursor, 'base64url').toString('utf8').split('|');
+
+    if (!publishedAt || !id) {
+      throw new Error('Invalid cursor payload.');
+    }
+
+    return { publishedAt, id };
   } catch {
     throw createHttpError(400, 'invalid_cursor', 'Cursor invalide.');
   }
 }
 
-function getTrendingScore(post) {
-  const ageHours = Math.max(1, (Date.now() - Date.parse(post.createdAt)) / 36e5);
-  return (post.likesCount * 2 + post.commentsCount * 3 + post.sharesCount) / ageHours;
+function toPost(row) {
+  return {
+    id: row.id,
+    authorId: row.author_id,
+    author: row.author_username,
+    title: row.title,
+    caption: row.caption,
+    mediaUrl: row.media_url,
+    mediaType: row.media_type,
+    mediaSizeBytes: row.media_size_bytes,
+    format: row.format,
+    location: row.location,
+    season: row.season,
+    status: row.status,
+    likesCount: row.likes_count,
+    commentsCount: row.comments_count,
+    sharesCount: row.shares_count,
+    tags: row.tags || [],
+    publishedAt: toIso(row.published_at),
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  };
 }
 
-function listFeed({ cursor, limit = pageSizeDefault, sort = 'recent' } = {}) {
-  seedPosts();
+function toComment(row) {
+  return {
+    id: row.id,
+    postId: row.post_id,
+    authorId: row.author_id,
+    author: row.author_username,
+    parentId: row.parent_id,
+    content: row.content,
+    status: row.status,
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  };
+}
 
+function postSelectSql() {
+  return `
+    SELECT
+      posts.*,
+      users.username AS author_username,
+      COALESCE(
+        ARRAY_AGG(tags.slug ORDER BY tags.slug) FILTER (WHERE tags.slug IS NOT NULL),
+        '{}'
+      ) AS tags
+    FROM posts
+    INNER JOIN users ON users.id = posts.author_id
+    LEFT JOIN post_tags ON post_tags.post_id = posts.id
+    LEFT JOIN tags ON tags.id = post_tags.tag_id
+  `;
+}
+
+async function listFeed({ cursor, limit = pageSizeDefault, sort = 'recent' } = {}) {
   const safeLimit = Math.min(Number(limit) || pageSizeDefault, pageSizeMax);
   const safeSort = sort === 'trending' ? 'trending' : 'recent';
   const cacheKey = `${safeSort}:${cursor || 'first'}:${safeLimit}`;
@@ -196,33 +181,41 @@ function listFeed({ cursor, limit = pageSizeDefault, sort = 'recent' } = {}) {
   }
 
   const cursorData = fromCursor(cursor);
-  let items = [...posts.values()].filter((post) => post.status === 'published');
-
-  items.sort((a, b) => {
-    if (safeSort === 'trending') {
-      return getTrendingScore(b) - getTrendingScore(a);
-    }
-
-    return b.createdAt.localeCompare(a.createdAt);
-  });
+  const params = [safeLimit + 1];
+  const where = ["posts.status = 'published'"];
 
   if (cursorData && safeSort === 'recent') {
-    items = items.filter(
-      (post) =>
-        post.createdAt < cursorData.createdAt ||
-        (post.createdAt === cursorData.createdAt && post.id < cursorData.id),
+    params.push(cursorData.publishedAt, cursorData.id);
+    where.push(
+      `(posts.published_at < $2::timestamptz OR (posts.published_at = $2::timestamptz AND posts.id < $3::uuid))`,
     );
   }
 
-  const page = items.slice(0, safeLimit);
-  const nextCursor = page.length === safeLimit ? toCursor(page[page.length - 1]) : null;
-  const payload = { items: page, nextCursor, sort: safeSort };
+  const orderBy =
+    safeSort === 'trending'
+      ? `((posts.likes_count * 2 + posts.comments_count * 3 + posts.shares_count)::numeric /
+          GREATEST(EXTRACT(EPOCH FROM (now() - posts.published_at)) / 3600, 1)) DESC,
+         posts.published_at DESC,
+         posts.id DESC`
+      : 'posts.published_at DESC, posts.id DESC';
+  const result = await query(
+    `${postSelectSql()}
+     WHERE ${where.join(' AND ')}
+     GROUP BY posts.id, users.username
+     ORDER BY ${orderBy}
+     LIMIT $1`,
+    params,
+  );
+  const rows = result.rows.slice(0, safeLimit);
+  const items = rows.map(toPost);
+  const nextCursor = result.rows.length > safeLimit ? toCursor(items[items.length - 1]) : null;
+  const payload = { items, nextCursor, sort: safeSort };
 
   feedCache.set(cacheKey, { payload, expiresAt: Date.now() + 20 * 1000 });
   return payload;
 }
 
-function createPost(payload, user) {
+async function createPost(payload, user) {
   const caption = String(payload.caption || '').trim();
 
   if (caption.length < 2 || caption.length > 2200) {
@@ -240,56 +233,109 @@ function createPost(payload, user) {
   validateMedia(payload);
   assertNoSpam(postAttemptsByUser, user.id, caption, 6, 10 * 60 * 1000);
 
-  const now = new Date().toISOString();
-  const post = {
-    id: createId('post'),
-    authorId: user.id,
-    author: user.username,
-    title: String(payload.title || '').trim(),
-    caption,
-    mediaUrl: payload.mediaUrl,
-    mediaType: payload.mediaType,
-    mediaSizeBytes: Number(payload.mediaSizeBytes) || 0,
-    format: payload.format,
-    location: String(payload.location || '').trim(),
-    season: payload.season,
-    tags: normalizeTags(payload.tags),
-    status: 'published',
-    likesCount: 0,
-    commentsCount: 0,
-    sharesCount: 0,
-    createdAt: now,
-    updatedAt: now,
-    publishedAt: now,
-  };
+  const tags = normalizeTags(payload.tags);
+  const post = await transaction(async (client) => {
+    const postResult = await client.query(
+      `INSERT INTO posts (
+         author_id,
+         title,
+         caption,
+         media_url,
+         media_type,
+         media_size_bytes,
+         format,
+         location,
+         season,
+         status,
+         published_at
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'published', now())
+       RETURNING *`,
+      [
+        user.id,
+        payload.title || null,
+        caption,
+        payload.mediaUrl || null,
+        payload.mediaType,
+        Number(payload.mediaSizeBytes) || 0,
+        payload.format,
+        payload.location || null,
+        payload.season || null,
+      ],
+    );
+    const createdPost = postResult.rows[0];
 
-  posts.set(post.id, post);
+    for (const tag of tags) {
+      const tagResult = await client.query(
+        `INSERT INTO tags (name, slug)
+         VALUES ($1, $2)
+         ON CONFLICT DO NOTHING
+         RETURNING id`,
+        [tag, tag],
+      );
+      const tagId =
+        tagResult.rows[0]?.id ||
+        (
+          await client.query(`SELECT id FROM tags WHERE lower(slug) = lower($1) LIMIT 1`, [tag])
+        ).rows[0].id;
+
+      await client.query(
+        `INSERT INTO post_tags (post_id, tag_id)
+         VALUES ($1, $2)
+         ON CONFLICT DO NOTHING`,
+        [createdPost.id, tagId],
+      );
+    }
+
+    const fullPostResult = await client.query(
+      `${postSelectSql()}
+       WHERE posts.id = $1
+       GROUP BY posts.id, users.username`,
+      [createdPost.id],
+    );
+
+    return toPost(fullPostResult.rows[0]);
+  });
+
   invalidateFeedCache();
-
   return post;
 }
 
-function getPost(postId) {
-  seedPosts();
-  const post = posts.get(postId);
+async function getPost(postId) {
+  assertUuid(postId, 'postId');
 
-  if (!post) {
+  const result = await query(
+    `${postSelectSql()}
+     WHERE posts.id = $1
+     GROUP BY posts.id, users.username`,
+    [postId],
+  );
+
+  if (result.rowCount === 0) {
     throw createHttpError(404, 'post_not_found', 'Post introuvable.');
   }
 
-  return post;
+  return toPost(result.rows[0]);
 }
 
-function listComments(postId) {
-  getPost(postId);
+async function listComments(postId) {
+  await getPost(postId);
 
-  return [...comments.values()]
-    .filter((comment) => comment.postId === postId && comment.status === 'published')
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const result = await query(
+    `SELECT comments.*, users.username AS author_username
+     FROM comments
+     INNER JOIN users ON users.id = comments.author_id
+     WHERE comments.post_id = $1 AND comments.status = 'published'
+     ORDER BY comments.created_at ASC`,
+    [postId],
+  );
+
+  return result.rows.map(toComment);
 }
 
-function addComment(postId, payload, user) {
-  const post = getPost(postId);
+async function addComment(postId, payload, user) {
+  await getPost(postId);
+
   const content = String(payload.content || '').trim();
 
   if (content.length < 2 || content.length > 800) {
@@ -302,53 +348,60 @@ function addComment(postId, payload, user) {
 
   assertNoSpam(commentAttemptsByUser, user.id, content, 10, 10 * 60 * 1000);
 
-  const now = new Date().toISOString();
-  const comment = {
-    id: createId('comment'),
-    postId,
-    authorId: user.id,
-    author: user.username,
-    content,
-    status: 'published',
-    createdAt: now,
-    updatedAt: now,
-  };
+  const result = await query(
+    `INSERT INTO comments (post_id, author_id, content)
+     VALUES ($1, $2, $3)
+     RETURNING *`,
+    [postId, user.id, content],
+  );
+  const comment = toComment({
+    ...result.rows[0],
+    author_username: user.username,
+  });
 
-  comments.set(comment.id, comment);
-  post.commentsCount += 1;
   invalidateFeedCache();
-
   return comment;
 }
 
-function toggleLike(postId, user) {
-  const post = getPost(postId);
-  const likeKey = `${user.id}:${postId}`;
-  const isLiked = likes.has(likeKey);
+async function toggleLike(postId, user) {
+  await getPost(postId);
 
-  if (isLiked) {
-    likes.delete(likeKey);
-    post.likesCount = Math.max(0, post.likesCount - 1);
-  } else {
-    likes.set(likeKey, {
-      id: createId('like'),
-      postId,
-      userId: user.id,
-      createdAt: new Date().toISOString(),
-    });
-    post.likesCount += 1;
+  const deleted = await query(
+    `DELETE FROM likes
+     WHERE user_id = $1 AND post_id = $2
+     RETURNING id`,
+    [user.id, postId],
+  );
+  const liked = deleted.rowCount === 0;
+
+  if (liked) {
+    await query(
+      `INSERT INTO likes (user_id, post_id)
+       VALUES ($1, $2)
+       ON CONFLICT DO NOTHING`,
+      [user.id, postId],
+    );
   }
 
+  const postResult = await query(`SELECT likes_count FROM posts WHERE id = $1`, [postId]);
+
   invalidateFeedCache();
-  return { liked: !isLiked, likesCount: post.likesCount };
+  return { liked, likesCount: postResult.rows[0].likes_count };
 }
 
-function sharePost(postId) {
-  const post = getPost(postId);
-  post.sharesCount += 1;
-  invalidateFeedCache();
+async function sharePost(postId, user = null) {
+  await getPost(postId);
 
-  return { sharesCount: post.sharesCount };
+  const result = await query(
+    `INSERT INTO post_shares (post_id, user_id)
+     VALUES ($1, $2)
+     RETURNING id`,
+    [postId, user?.id || null],
+  );
+  const postResult = await query(`SELECT shares_count FROM posts WHERE id = $1`, [postId]);
+
+  invalidateFeedCache();
+  return { shareId: result.rows[0].id, sharesCount: postResult.rows[0].shares_count };
 }
 
 const postsService = {
