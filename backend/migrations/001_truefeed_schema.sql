@@ -418,6 +418,24 @@ FROM (
 WHERE debate_threads.id = counts.id;
 
 INSERT INTO places (name, category, city, lat, lng, score, tags)
+SELECT 'Tour Eiffel', 'Monument', 'Paris', 48.8584, 2.2945, 9.9, ARRAY['vue', 'culture', 'paris']
+WHERE NOT EXISTS (
+  SELECT 1 FROM places WHERE lower(name) = lower('Tour Eiffel') AND lower(city) = lower('Paris')
+);
+
+INSERT INTO places (name, category, city, lat, lng, score, tags)
+SELECT 'Musee du Louvre', 'Musee', 'Paris', 48.8606, 2.3376, 9.7, ARRAY['musee', 'culture', 'paris']
+WHERE NOT EXISTS (
+  SELECT 1 FROM places WHERE lower(name) = lower('Musee du Louvre') AND lower(city) = lower('Paris')
+);
+
+INSERT INTO places (name, category, city, lat, lng, score, tags)
+SELECT 'Montmartre', 'Vue', 'Paris', 48.8867, 2.3431, 9.6, ARRAY['vue', 'marche', 'paris']
+WHERE NOT EXISTS (
+  SELECT 1 FROM places WHERE lower(name) = lower('Montmartre') AND lower(city) = lower('Paris')
+);
+
+INSERT INTO places (name, category, city, lat, lng, score, tags)
 SELECT 'Fushimi Inari', 'Temple', 'Kyoto', 34.9671, 135.7727, 9.8, ARRAY['culture', 'budget', 'hanami']
 WHERE NOT EXISTS (
   SELECT 1 FROM places WHERE lower(name) = lower('Fushimi Inari') AND lower(city) = lower('Kyoto')

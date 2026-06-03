@@ -11,7 +11,7 @@ type MapExplorerProps = {
   onSelectPlace: (place: MapPlace) => void;
 };
 
-const defaultCenter = { lat: 35.0, lng: 135.76 };
+const defaultCenter = { lat: 48.8584, lng: 2.2945 };
 
 function getCenter(places: MapPlace[], selectedPlace: MapPlace | null) {
   if (selectedPlace) {

@@ -1,6 +1,6 @@
 const { query } = require('../data/db');
 
-const categories = ['Temple', 'Food', 'Montagne', 'Vue', 'Marche'];
+const categories = ['Monument', 'Musee', 'Food', 'Montagne', 'Vue', 'Marche'];
 
 function hasValidLocation(lat, lng) {
   return Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
@@ -67,7 +67,11 @@ async function listPlaces({ category, lat, lng, radiusKm = 25 }) {
        ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
      ) AS places_with_distance
      ${distanceWhere}
-     ORDER BY distance_km ASC NULLS LAST, score DESC, name ASC
+     ORDER BY
+       distance_km ASC NULLS LAST,
+       CASE WHEN lower(city) = 'paris' THEN 0 ELSE 1 END ASC,
+       score DESC,
+       name ASC
      LIMIT 50`,
     params,
   );

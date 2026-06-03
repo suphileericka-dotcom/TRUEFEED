@@ -48,7 +48,7 @@ export default function ExploreScreen() {
   const [locationLabel, setLocationLabel] = useState('Activer GPS');
 
   const visibleCategories = useMemo(
-    () => (categories.length > 0 ? categories : ['Temple', 'Food', 'Montagne']),
+    () => (categories.length > 0 ? categories : ['Monument', 'Musee', 'Food']),
     [categories],
   );
 
@@ -64,7 +64,7 @@ export default function ExploreScreen() {
       })
       .catch(() => {
         if (isMounted) {
-          setCategories(['Temple', 'Food', 'Montagne']);
+          setCategories(['Monument', 'Musee', 'Food']);
         }
       });
 
