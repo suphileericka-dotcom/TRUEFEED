@@ -135,6 +135,7 @@ export default function ExploreScreen() {
         selectedPlace={selectedPlace}
         theme={theme}
         onSelectPlace={setSelectedPlace}
+        userLocation={location ?? undefined}
       />
 
       <View

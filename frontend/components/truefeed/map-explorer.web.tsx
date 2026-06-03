@@ -9,17 +9,29 @@ type MapExplorerProps = {
   selectedPlace: MapPlace | null;
   theme: SeasonTheme;
   onSelectPlace: (place: MapPlace) => void;
+  userLocation?: {
+    lat: number;
+    lng: number;
+  };
 };
 
 const defaultCenter = { lat: 48.8584, lng: 2.2945 };
 
-function getCenter(places: MapPlace[], selectedPlace: MapPlace | null) {
+function getCenter(
+  places: MapPlace[],
+  selectedPlace: MapPlace | null,
+  userLocation?: { lat: number; lng: number },
+) {
   if (selectedPlace) {
     return { lat: selectedPlace.lat, lng: selectedPlace.lng };
   }
 
   if (places[0]) {
     return { lat: places[0].lat, lng: places[0].lng };
+  }
+
+  if (userLocation) {
+    return userLocation;
   }
 
   return defaultCenter;
@@ -38,9 +50,18 @@ const iframeStyle: CSSProperties = {
   width: '100%',
 };
 
-export function MapExplorer({ places, selectedPlace, theme, onSelectPlace }: MapExplorerProps) {
+export function MapExplorer({
+  places,
+  selectedPlace,
+  theme,
+  onSelectPlace,
+  userLocation,
+}: MapExplorerProps) {
   const [isClient, setIsClient] = useState(false);
-  const center = useMemo(() => getCenter(places, selectedPlace), [places, selectedPlace]);
+  const center = useMemo(
+    () => getCenter(places, selectedPlace, userLocation),
+    [places, selectedPlace, userLocation],
+  );
   const mapUrl = useMemo(() => getOpenStreetMapUrl(center.lat, center.lng), [center.lat, center.lng]);
 
   useEffect(() => {

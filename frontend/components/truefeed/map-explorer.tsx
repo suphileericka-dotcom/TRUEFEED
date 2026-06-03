@@ -10,6 +10,10 @@ type MapExplorerProps = {
   selectedPlace: MapPlace | null;
   theme: SeasonTheme;
   onSelectPlace: (place: MapPlace) => void;
+  userLocation?: {
+    lat: number;
+    lng: number;
+  };
 };
 
 function pinPosition(index: number) {
