@@ -2,8 +2,10 @@
 
 ## Backend Railway
 
-- Root directory: `backend`.
-- Builder: `DOCKERFILE` (`backend/Dockerfile`).
+- Root directory dashboard recommande: `backend`.
+- Fallback repo: un `Dockerfile` existe aussi a la racine pour les cas ou Railway ignore/ne recoit pas le root directory dashboard.
+- Builder: `DOCKERFILE`.
+- Dockerfile path config-as-code: `Dockerfile`.
 - Start: `npm start`.
 - Healthcheck: `/api/health`.
 - Readiness: `/api/health/ready`.
