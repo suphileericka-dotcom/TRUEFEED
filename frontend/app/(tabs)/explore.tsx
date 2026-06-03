@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
-import type { DimensionValue } from 'react-native';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 
 import { BrandHeader, Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
-import { fonts, mapExplorerPins, seasonThemes } from '@/constants/truefeed';
+import { MapExplorer } from '@/components/truefeed/map-explorer';
+import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 import { mapApi, type MapPlace } from '@/services/api/map';
 
@@ -12,10 +12,6 @@ type LocationState = {
   lat: number;
   lng: number;
 } | null;
-
-function pinPosition(index: number) {
-  return mapExplorerPins[index % mapExplorerPins.length];
-}
 
 function getWebLocation() {
   return new Promise<LocationState>((resolve, reject) => {
@@ -179,34 +175,12 @@ export default function ExploreScreen() {
         ))}
       </View>
 
-      <View style={[styles.map, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
-        <View style={[styles.mapPath, { backgroundColor: theme.border }]} />
-        {places.map((place, index) => {
-          const position = pinPosition(index);
-
-          return (
-            <Pressable
-              key={place.id}
-              onPress={() => setSelectedPlace(place)}
-              style={[
-                styles.pin,
-                {
-                  left: position.x as DimensionValue,
-                  top: position.y as DimensionValue,
-                  backgroundColor: selectedPlace?.id === place.id ? theme.accentStrong : theme.surface,
-                  borderColor: theme.accentStrong,
-                },
-              ]}
-            >
-              <Ionicons
-                name="location"
-                size={18}
-                color={selectedPlace?.id === place.id ? '#FFFFFF' : theme.accentStrong}
-              />
-            </Pressable>
-          );
-        })}
-      </View>
+      <MapExplorer
+        places={places}
+        selectedPlace={selectedPlace}
+        theme={theme}
+        onSelectPlace={setSelectedPlace}
+      />
 
       <View
         style={[styles.placeCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
@@ -249,28 +223,6 @@ const styles = StyleSheet.create({
   },
   searchText: { fontFamily: fonts.body, fontSize: 16 },
   categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  map: { borderRadius: 30, borderWidth: 1, height: 390, overflow: 'hidden' },
-  mapPath: {
-    borderRadius: 80,
-    height: 280,
-    left: '30%',
-    opacity: 0.55,
-    position: 'absolute',
-    top: 50,
-    transform: [{ rotate: '28deg' }],
-    width: 70,
-  },
-  pin: {
-    alignItems: 'center',
-    borderRadius: 18,
-    borderWidth: 2,
-    height: 38,
-    justifyContent: 'center',
-    marginLeft: -19,
-    marginTop: -19,
-    position: 'absolute',
-    width: 38,
-  },
   placeCard: { borderRadius: 26, borderWidth: 1, gap: 12, padding: 18 },
   placeName: { fontFamily: fonts.title, fontSize: 30, fontWeight: '700' },
   placeMeta: { fontFamily: fonts.body, fontSize: 15, fontWeight: '800' },
