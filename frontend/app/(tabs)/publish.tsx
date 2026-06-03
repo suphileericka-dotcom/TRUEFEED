@@ -255,17 +255,17 @@ export default function PublishScreen() {
       >
         <Text style={[styles.statusTitle, { color: theme.text }]}>
           {publishState === 'idle'
-            ? 'Pret a composer'
+            ? 'Pret a publier'
             : publishState === 'draft'
               ? 'Brouillon enregistre'
-              : 'Pret a etre envoye a l API'}
+              : 'Publication prete'}
         </Text>
         <Text style={[styles.statusText, { color: theme.muted }]}>
           {publishState === 'idle'
-            ? 'Choisis ton format, complete la legende puis connecte le bouton a la route backend.'
+            ? 'Complete ton post, ajoute les bons tags, puis publie quand tout est pret.'
             : publishState === 'draft'
-              ? 'Le prochain branchement logique est un vrai stockage local ou base de donnees.'
-              : 'La route `POST /api/posts` cote backend est deja presente pour la suite.'}
+              ? 'Ton contenu est garde de cote pour etre repris plus tard.'
+              : 'Ton post peut maintenant apparaitre dans le feed TRUEFEED.'}
         </Text>
       </View>
 

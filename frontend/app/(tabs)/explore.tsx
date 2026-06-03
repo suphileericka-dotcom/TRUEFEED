@@ -231,7 +231,7 @@ export default function ExploreScreen() {
         <Text style={[styles.placeCopy, { color: theme.muted }]}>
           {selectedPlace
             ? `Tags: ${selectedPlace.tags.join(', ') || 'aucun tag'}`
-            : 'Les lieux viennent de l API MapExplorer et sont tries par distance quand le GPS est actif.'}
+            : 'Active le GPS pour voir les lieux proches classes par distance.'}
         </Text>
       </View>
     </ScreenShell>
