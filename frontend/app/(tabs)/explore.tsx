@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BrandHeader, Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { MapExplorer } from '@/components/truefeed/map-explorer';
@@ -23,11 +23,26 @@ export default function ExploreScreen() {
   const [selectedPlace, setSelectedPlace] = useState<MapPlace | null>(null);
   const [location, setLocation] = useState<LocationState>(null);
   const [locationLabel, setLocationLabel] = useState('Activer GPS');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const visibleCategories = useMemo(
     () => (categories.length > 0 ? categories : ['Monument', 'Musee', 'Food']),
     [categories],
   );
+  const visiblePlaces = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    if (!query) {
+      return places;
+    }
+
+    return places.filter((place) =>
+      [place.name, place.city, place.category, ...place.tags]
+        .join(' ')
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [places, searchQuery]);
 
   useEffect(() => {
     let isMounted = true;
@@ -80,6 +95,12 @@ export default function ExploreScreen() {
     };
   }, [location?.lat, location?.lng, selectedCategory]);
 
+  useEffect(() => {
+    setSelectedPlace(
+      (current) => visiblePlaces.find((item) => item.id === current?.id) || visiblePlaces[0] || null,
+    );
+  }, [visiblePlaces]);
+
   async function enableLocation() {
     try {
       setLocationLabel('GPS...');
@@ -105,9 +126,13 @@ export default function ExploreScreen() {
         style={[styles.searchBar, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}
       >
         <Ionicons name="search" size={20} color={theme.muted} />
-        <Text style={[styles.searchText, { color: theme.muted }]}>
-          Rechercher lieu, categorie, tag...
-        </Text>
+        <TextInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Rechercher lieu, categorie, tag..."
+          placeholderTextColor={theme.muted}
+          style={[styles.searchInput, { color: theme.text }]}
+        />
       </View>
 
       <View style={styles.categoryRow}>
@@ -131,7 +156,7 @@ export default function ExploreScreen() {
       </View>
 
       <MapExplorer
-        places={places}
+        places={visiblePlaces}
         selectedPlace={selectedPlace}
         theme={theme}
         onSelectPlace={setSelectedPlace}
@@ -177,7 +202,7 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 16,
   },
-  searchText: { fontFamily: fonts.body, fontSize: 16 },
+  searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 16 },
   categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   placeCard: { borderRadius: 26, borderWidth: 1, gap: 12, padding: 18 },
   placeName: { fontFamily: fonts.title, fontSize: 30, fontWeight: '700' },
