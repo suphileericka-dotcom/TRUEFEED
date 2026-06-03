@@ -6,24 +6,28 @@ const fallbackByEnvironment = {
     appName: 'TRUEFEED Dev',
   },
   staging: {
-    apiUrl: 'https://staging-api.truefeed.example',
+    apiUrl: 'https://truefeed-production.up.railway.app',
     appName: 'TRUEFEED Staging',
   },
   production: {
-    apiUrl: 'https://api.truefeed.example',
+    apiUrl: 'https://truefeed-production.up.railway.app',
     appName: 'TRUEFEED',
   },
 } as const;
 
-function getEnvironment(value?: string): AppEnvironment {
+function getEnvironment(value?: string, nodeEnv?: string): AppEnvironment {
   if (value === 'staging' || value === 'production') {
     return value;
+  }
+
+  if (nodeEnv === 'production') {
+    return 'production';
   }
 
   return 'development';
 }
 
-const environment = getEnvironment(process.env.EXPO_PUBLIC_APP_ENV);
+const environment = getEnvironment(process.env.EXPO_PUBLIC_APP_ENV, process.env.NODE_ENV);
 const fallback = fallbackByEnvironment[environment];
 
 export const env = {
