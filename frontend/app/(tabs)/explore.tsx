@@ -1,8 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
 import { useEffect, useMemo, useState } from 'react';
 import type { DimensionValue } from 'react-native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BrandHeader, Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, mapExplorerPins, seasonThemes } from '@/constants/truefeed';
@@ -16,6 +15,30 @@ type LocationState = {
 
 function pinPosition(index: number) {
   return mapExplorerPins[index % mapExplorerPins.length];
+}
+
+function getWebLocation() {
+  return new Promise<LocationState>((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation unavailable.'));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      reject,
+      {
+        enableHighAccuracy: false,
+        maximumAge: 60_000,
+        timeout: 10_000,
+      },
+    );
+  });
 }
 
 export default function ExploreScreen() {
@@ -85,23 +108,35 @@ export default function ExploreScreen() {
   }, [location?.lat, location?.lng, selectedCategory]);
 
   async function enableLocation() {
-    setLocationLabel('GPS...');
-    const permission = await Location.requestForegroundPermissionsAsync();
+    try {
+      setLocationLabel('GPS...');
 
-    if (permission.status !== 'granted') {
-      setLocationLabel('GPS refuse');
-      return;
+      if (Platform.OS === 'web') {
+        setLocation(await getWebLocation());
+        setLocationLabel('Autour de moi');
+        return;
+      }
+
+      const Location = await import('expo-location');
+      const permission = await Location.requestForegroundPermissionsAsync();
+
+      if (permission.status !== 'granted') {
+        setLocationLabel('GPS refuse');
+        return;
+      }
+
+      const current = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      setLocation({
+        lat: current.coords.latitude,
+        lng: current.coords.longitude,
+      });
+      setLocationLabel('Autour de moi');
+    } catch {
+      setLocationLabel('GPS indispo');
     }
-
-    const current = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    });
-
-    setLocation({
-      lat: current.coords.latitude,
-      lng: current.coords.longitude,
-    });
-    setLocationLabel('Autour de moi');
   }
 
   return (
