@@ -174,6 +174,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS likes_user_comment_key ON likes (user_id, comm
 CREATE INDEX IF NOT EXISTS likes_post_created_at_idx ON likes (post_id, created_at DESC)
   WHERE post_id IS NOT NULL;
 
+CREATE TABLE IF NOT EXISTS post_shares (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users (id) ON DELETE SET NULL,
+  post_id UUID NOT NULL REFERENCES posts (id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS post_shares_post_created_at_idx ON post_shares (post_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS post_shares_user_created_at_idx ON post_shares (user_id, created_at DESC)
+  WHERE user_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS debate_threads (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   author_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -294,6 +305,27 @@ CREATE TRIGGER comments_sync_post_count
 AFTER INSERT OR UPDATE OR DELETE ON comments
 FOR EACH ROW EXECUTE FUNCTION sync_post_comments_count();
 
+CREATE OR REPLACE FUNCTION sync_post_shares_count()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    UPDATE posts SET shares_count = shares_count + 1 WHERE id = NEW.post_id;
+  ELSIF TG_OP = 'DELETE' THEN
+    UPDATE posts SET shares_count = GREATEST(shares_count - 1, 0) WHERE id = OLD.post_id;
+  ELSIF TG_OP = 'UPDATE' AND OLD.post_id IS DISTINCT FROM NEW.post_id THEN
+    UPDATE posts SET shares_count = GREATEST(shares_count - 1, 0) WHERE id = OLD.post_id;
+    UPDATE posts SET shares_count = shares_count + 1 WHERE id = NEW.post_id;
+  END IF;
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS post_shares_sync_post_count ON post_shares;
+CREATE TRIGGER post_shares_sync_post_count
+AFTER INSERT OR UPDATE OR DELETE ON post_shares
+FOR EACH ROW EXECUTE FUNCTION sync_post_shares_count();
+
 CREATE OR REPLACE FUNCTION sync_debate_replies_count()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -349,3 +381,38 @@ DROP TRIGGER IF EXISTS debate_votes_sync_thread_count ON debate_votes;
 CREATE TRIGGER debate_votes_sync_thread_count
 AFTER INSERT OR UPDATE OR DELETE ON debate_votes
 FOR EACH ROW EXECUTE FUNCTION sync_debate_votes_count();
+
+UPDATE posts
+SET likes_count = counts.likes_count,
+    comments_count = counts.comments_count,
+    shares_count = counts.shares_count
+FROM (
+  SELECT
+    posts.id,
+    COUNT(DISTINCT likes.id) FILTER (WHERE likes.post_id IS NOT NULL)::INTEGER AS likes_count,
+    COUNT(DISTINCT comments.id) FILTER (WHERE comments.status = 'published')::INTEGER AS comments_count,
+    COUNT(DISTINCT post_shares.id)::INTEGER AS shares_count
+  FROM posts
+  LEFT JOIN likes ON likes.post_id = posts.id
+  LEFT JOIN comments ON comments.post_id = posts.id
+  LEFT JOIN post_shares ON post_shares.post_id = posts.id
+  GROUP BY posts.id
+) AS counts
+WHERE posts.id = counts.id;
+
+UPDATE debate_threads
+SET up_votes = counts.up_votes,
+    down_votes = counts.down_votes,
+    replies_count = counts.replies_count
+FROM (
+  SELECT
+    debate_threads.id,
+    COUNT(DISTINCT debate_votes.user_id) FILTER (WHERE debate_votes.value = 'up')::INTEGER AS up_votes,
+    COUNT(DISTINCT debate_votes.user_id) FILTER (WHERE debate_votes.value = 'down')::INTEGER AS down_votes,
+    COUNT(DISTINCT debate_replies.id)::INTEGER AS replies_count
+  FROM debate_threads
+  LEFT JOIN debate_votes ON debate_votes.thread_id = debate_threads.id
+  LEFT JOIN debate_replies ON debate_replies.thread_id = debate_threads.id
+  GROUP BY debate_threads.id
+) AS counts
+WHERE debate_threads.id = counts.id;

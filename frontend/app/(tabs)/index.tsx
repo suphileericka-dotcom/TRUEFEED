@@ -77,7 +77,7 @@ const FeedCard = memo(function FeedCard({
 
   return (
     <Pressable
-      onPress={() => router.push(`/post/${post.id}`)}
+      onPress={() => router.push({ pathname: '/post/[id]', params: { id: post.id } })}
       style={[styles.postCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
     >
       <View style={styles.postHeader}>
@@ -115,7 +115,7 @@ const FeedCard = memo(function FeedCard({
             color={liked ? '#E94B6A' : theme.accentStrong}
           />
         </Pressable>
-        <Pressable onPress={() => router.push(`/post/${post.id}`)}>
+        <Pressable onPress={() => router.push({ pathname: '/post/[id]', params: { id: post.id } })}>
           <Ionicons name="chatbubble-outline" size={22} color={theme.muted} />
         </Pressable>
         <Pressable onPress={() => setShared(true)}>

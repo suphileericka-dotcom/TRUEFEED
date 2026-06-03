@@ -9,6 +9,17 @@ function logInfo(message, context = {}) {
   );
 }
 
+function logWarn(message, context = {}) {
+  console.warn(
+    JSON.stringify({
+      level: 'warn',
+      message,
+      ...context,
+      timestamp: new Date().toISOString(),
+    }),
+  );
+}
+
 function logError(message, context = {}) {
   console.error(
     JSON.stringify({
@@ -23,4 +34,5 @@ function logError(message, context = {}) {
 module.exports = {
   logError,
   logInfo,
+  logWarn,
 };

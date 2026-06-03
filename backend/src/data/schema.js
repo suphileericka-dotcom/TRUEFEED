@@ -137,6 +137,23 @@ const dataSchema = {
     ],
     indexes: [{ name: 'likes_post_created_at_idx', fields: ['postId', 'createdAt'] }],
   },
+  postShares: {
+    description: 'Evenements de partage des posts pour maintenir sharesCount.',
+    fields: {
+      id: { type: 'string', required: true, unique: true },
+      userId: { type: 'string', required: false, references: 'users.id' },
+      postId: { type: 'string', required: true, references: 'posts.id' },
+      createdAt: { type: 'datetime', required: true },
+    },
+    indexes: [
+      { name: 'post_shares_post_created_at_idx', fields: ['postId', 'createdAt'] },
+      {
+        name: 'post_shares_user_created_at_idx',
+        fields: ['userId', 'createdAt'],
+        where: 'userId IS NOT NULL',
+      },
+    ],
+  },
   reports: {
     description: 'Signalements moderes par un admin ou moderateur.',
     fields: {

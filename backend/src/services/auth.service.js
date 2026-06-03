@@ -1,13 +1,68 @@
 const crypto = require('crypto');
 
 const { authConfig } = require('../config/auth');
+const { query } = require('../data/db');
 const { createHttpError } = require('../utils/httpError');
 
-const usersById = new Map();
-const usersByEmail = new Map();
-const usersByUsername = new Map();
-const accessTokens = new Map();
-const refreshTokens = new Map();
+function base64UrlEncode(value) {
+  return Buffer.from(JSON.stringify(value)).toString('base64url');
+}
+
+function base64UrlDecode(value) {
+  return JSON.parse(Buffer.from(value, 'base64url').toString('utf8'));
+}
+
+function signJwt(payload, expiresInMs) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const body = {
+    ...payload,
+    iat: now,
+    exp: Math.floor((Date.now() + expiresInMs) / 1000),
+  };
+  const unsignedToken = `${base64UrlEncode(header)}.${base64UrlEncode(body)}`;
+  const signature = crypto
+    .createHmac('sha256', authConfig.accessToken.secret)
+    .update(unsignedToken)
+    .digest('base64url');
+
+  return `${unsignedToken}.${signature}`;
+}
+
+function verifyJwt(token) {
+  try {
+    const [header, body, signature] = token.split('.');
+
+    if (!header || !body || !signature) {
+      return null;
+    }
+
+    const unsignedToken = `${header}.${body}`;
+    const expectedSignature = crypto
+      .createHmac('sha256', authConfig.accessToken.secret)
+      .update(unsignedToken)
+      .digest('base64url');
+    const signatureBuffer = Buffer.from(signature, 'base64url');
+    const expectedSignatureBuffer = Buffer.from(expectedSignature, 'base64url');
+
+    if (
+      signatureBuffer.length !== expectedSignatureBuffer.length ||
+      !crypto.timingSafeEqual(signatureBuffer, expectedSignatureBuffer)
+    ) {
+      return null;
+    }
+
+    const payload = base64UrlDecode(body);
+
+    if (!payload.exp || payload.exp <= Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+
+    return payload;
+  } catch {
+    return null;
+  }
+}
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
   const hash = crypto
@@ -27,38 +82,45 @@ function verifyPassword(password, passwordHash) {
   );
 }
 
-function toPublicUser(user) {
-  return {
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    displayName: user.displayName,
-    avatarUrl: user.avatarUrl,
-    bio: user.bio,
-    role: user.role,
-    status: user.status,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-  };
-}
-
-function createToken() {
+function createRefreshToken() {
   return crypto.randomBytes(32).toString('base64url');
 }
 
-function createSession(user) {
-  const now = Date.now();
-  const accessToken = createToken();
-  const refreshToken = createToken();
+function hashToken(token) {
+  return crypto.createHmac('sha256', authConfig.refreshToken.secret).update(token).digest('hex');
+}
 
-  accessTokens.set(accessToken, {
-    userId: user.id,
-    expiresAt: now + authConfig.accessToken.expiresInMs,
-  });
-  refreshTokens.set(refreshToken, {
-    userId: user.id,
-    expiresAt: now + authConfig.refreshToken.expiresInMs,
-  });
+function toPublicUser(row) {
+  return {
+    id: row.id,
+    username: row.username,
+    email: row.email,
+    displayName: row.display_name,
+    avatarUrl: row.avatar_url,
+    bio: row.bio,
+    role: row.role,
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function createSession(user) {
+  const refreshToken = createRefreshToken();
+  const accessToken = signJwt(
+    {
+      sub: user.id,
+      role: user.role,
+    },
+    authConfig.accessToken.expiresInMs,
+  );
+  const expiresAt = new Date(Date.now() + authConfig.refreshToken.expiresInMs);
+
+  await query(
+    `INSERT INTO refresh_sessions (user_id, token_hash, expires_at)
+     VALUES ($1, $2, $3)`,
+    [user.id, hashToken(refreshToken), expiresAt],
+  );
 
   return {
     accessToken,
@@ -68,117 +130,157 @@ function createSession(user) {
   };
 }
 
-function register(payload) {
-  const emailKey = payload.email.toLowerCase();
-  const usernameKey = payload.username.toLowerCase();
+async function register(payload) {
+  const existing = await query(
+    `SELECT id, email, username
+     FROM users
+     WHERE lower(email) = lower($1) OR lower(username) = lower($2)
+     LIMIT 1`,
+    [payload.email, payload.username],
+  );
 
-  if (usersByEmail.has(emailKey)) {
-    throw createHttpError(409, 'email_taken', 'Cet email est deja utilise.');
+  if (existing.rowCount > 0) {
+    const row = existing.rows[0];
+
+    if (row.email.toLowerCase() === payload.email.toLowerCase()) {
+      throw createHttpError(409, 'email_taken', 'Cet email est deja utilise.');
+    }
+
+    if (row.username.toLowerCase() === payload.username.toLowerCase()) {
+      throw createHttpError(409, 'username_taken', 'Ce nom utilisateur est deja utilise.');
+    }
   }
 
-  if (usersByUsername.has(usernameKey)) {
-    throw createHttpError(409, 'username_taken', 'Ce nom utilisateur est deja utilise.');
-  }
-
-  const now = new Date().toISOString();
-  const user = {
-    id: crypto.randomUUID(),
-    username: payload.username,
-    email: payload.email,
-    displayName: payload.displayName,
-    avatarUrl: payload.avatarUrl,
-    bio: payload.bio,
-    role: payload.role === 'admin' ? 'admin' : 'user',
-    status: 'active',
-    passwordHash: hashPassword(payload.password),
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  usersById.set(user.id, user);
-  usersByEmail.set(emailKey, user.id);
-  usersByUsername.set(usernameKey, user.id);
+  const result = await query(
+    `INSERT INTO users (
+       username,
+       email,
+       display_name,
+       avatar_url,
+       bio,
+       password_hash,
+       role
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING *`,
+    [
+      payload.username,
+      payload.email,
+      payload.displayName,
+      payload.avatarUrl || null,
+      payload.bio || null,
+      hashPassword(payload.password),
+      payload.role === 'admin' ? 'admin' : 'user',
+    ],
+  );
+  const user = toPublicUser(result.rows[0]);
 
   return {
-    user: toPublicUser(user),
-    session: createSession(user),
+    user,
+    session: await createSession(user),
   };
 }
 
-function login({ email, password }) {
-  const userId = usersByEmail.get(email.toLowerCase());
-  const user = userId ? usersById.get(userId) : null;
+async function login({ email, password }) {
+  const result = await query(
+    `SELECT *
+     FROM users
+     WHERE lower(email) = lower($1)
+     LIMIT 1`,
+    [email],
+  );
+  const row = result.rows[0];
 
-  if (!user || !verifyPassword(password, user.passwordHash)) {
+  if (!row || !verifyPassword(password, row.password_hash)) {
     throw createHttpError(401, 'invalid_credentials', 'Email ou mot de passe incorrect.');
   }
 
-  if (user.status !== 'active') {
+  if (row.status !== 'active') {
     throw createHttpError(403, 'user_inactive', 'Ce compte ne peut pas se connecter.');
   }
 
+  const user = toPublicUser(row);
+
   return {
-    user: toPublicUser(user),
-    session: createSession(user),
+    user,
+    session: await createSession(user),
   };
 }
 
-function refresh(refreshToken) {
-  const session = refreshTokens.get(refreshToken);
+async function refresh(refreshToken) {
+  const tokenHash = hashToken(refreshToken);
+  const sessionResult = await query(
+    `SELECT refresh_sessions.id AS session_id, users.*
+     FROM refresh_sessions
+     INNER JOIN users ON users.id = refresh_sessions.user_id
+     WHERE refresh_sessions.token_hash = $1
+       AND refresh_sessions.revoked_at IS NULL
+       AND refresh_sessions.expires_at > now()
+       AND users.status = 'active'
+     LIMIT 1`,
+    [tokenHash],
+  );
+  const row = sessionResult.rows[0];
 
-  if (!session || session.expiresAt <= Date.now()) {
-    refreshTokens.delete(refreshToken);
+  if (!row) {
     throw createHttpError(401, 'invalid_refresh_token', 'Refresh token invalide ou expire.');
   }
 
-  const user = usersById.get(session.userId);
+  await query(`UPDATE refresh_sessions SET revoked_at = now() WHERE id = $1`, [row.session_id]);
 
-  if (!user) {
-    throw createHttpError(401, 'invalid_refresh_token', 'Refresh token invalide.');
-  }
-
-  refreshTokens.delete(refreshToken);
+  const user = toPublicUser(row);
 
   return {
-    user: toPublicUser(user),
-    session: createSession(user),
+    user,
+    session: await createSession(user),
   };
 }
 
-function logout(refreshToken) {
-  if (refreshToken) {
-    refreshTokens.delete(refreshToken);
+async function logout(refreshToken) {
+  if (!refreshToken) {
+    return;
   }
+
+  await query(`UPDATE refresh_sessions SET revoked_at = now() WHERE token_hash = $1`, [
+    hashToken(refreshToken),
+  ]);
 }
 
-function getUserFromAccessToken(accessToken) {
-  const session = accessTokens.get(accessToken);
+async function getUserFromAccessToken(accessToken) {
+  const payload = verifyJwt(accessToken);
 
-  if (!session || session.expiresAt <= Date.now()) {
-    accessTokens.delete(accessToken);
+  if (!payload?.sub) {
     return null;
   }
 
-  const user = usersById.get(session.userId);
-  return user ? toPublicUser(user) : null;
+  const result = await query(
+    `SELECT *
+     FROM users
+     WHERE id = $1 AND status = 'active'
+     LIMIT 1`,
+    [payload.sub],
+  );
+
+  return result.rows[0] ? toPublicUser(result.rows[0]) : null;
 }
 
-function updateProfile(userId, payload) {
-  const user = usersById.get(userId);
+async function updateProfile(userId, payload) {
+  const result = await query(
+    `UPDATE users
+     SET display_name = COALESCE($2, display_name),
+         avatar_url = COALESCE($3, avatar_url),
+         bio = COALESCE($4, bio),
+         updated_at = now()
+     WHERE id = $1
+     RETURNING *`,
+    [userId, payload.displayName || null, payload.avatarUrl || null, payload.bio || null],
+  );
 
-  if (!user) {
+  if (result.rowCount === 0) {
     throw createHttpError(404, 'user_not_found', 'Utilisateur introuvable.');
   }
 
-  const nextUser = {
-    ...user,
-    ...payload,
-    updatedAt: new Date().toISOString(),
-  };
-
-  usersById.set(userId, nextUser);
-
-  return toPublicUser(nextUser);
+  return toPublicUser(result.rows[0]);
 }
 
 const authService = {

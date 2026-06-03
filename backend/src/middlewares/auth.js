@@ -11,17 +11,22 @@ function getBearerToken(req) {
   return header.slice('Bearer '.length).trim();
 }
 
-function requireAuth(req, _res, next) {
+async function requireAuth(req, _res, next) {
   const token = getBearerToken(req);
-  const user = token ? authService.getUserFromAccessToken(token) : null;
 
-  if (!user) {
-    next(createHttpError(401, 'unauthorized', 'Authentification requise.'));
-    return;
+  try {
+    const user = token ? await authService.getUserFromAccessToken(token) : null;
+
+    if (!user) {
+      next(createHttpError(401, 'unauthorized', 'Authentification requise.'));
+      return;
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    next(error);
   }
-
-  req.user = user;
-  next();
 }
 
 function requireRole(roles) {

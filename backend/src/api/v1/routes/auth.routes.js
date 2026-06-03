@@ -33,10 +33,10 @@ const refreshSchema = {
   refreshToken: { type: 'string', required: true, minLength: 20 },
 };
 
-authV1Router.post('/register', (req, res, next) => {
+authV1Router.post('/register', async (req, res, next) => {
   try {
     const payload = validate(registerSchema, req.body);
-    const result = authService.register(payload);
+    const result = await authService.register(payload);
 
     analyticsService.track('signup', { userId: result.user.id, role: result.user.role });
     res.status(201).json(result);
@@ -45,10 +45,10 @@ authV1Router.post('/register', (req, res, next) => {
   }
 });
 
-authV1Router.post('/login', loginRateLimit, (req, res, next) => {
+authV1Router.post('/login', loginRateLimit, async (req, res, next) => {
   try {
     const payload = validate(loginSchema, req.body);
-    const result = authService.login(payload);
+    const result = await authService.login(payload);
 
     analyticsService.track('login', { userId: result.user.id });
     res.json(result);
@@ -57,10 +57,10 @@ authV1Router.post('/login', loginRateLimit, (req, res, next) => {
   }
 });
 
-authV1Router.post('/refresh', (req, res, next) => {
+authV1Router.post('/refresh', async (req, res, next) => {
   try {
     const { refreshToken } = validate(refreshSchema, req.body);
-    const result = authService.refresh(refreshToken);
+    const result = await authService.refresh(refreshToken);
 
     res.json(result);
   } catch (error) {
@@ -68,11 +68,11 @@ authV1Router.post('/refresh', (req, res, next) => {
   }
 });
 
-authV1Router.post('/logout', (req, res, next) => {
+authV1Router.post('/logout', async (req, res, next) => {
   try {
     const { refreshToken } = validate(refreshSchema, req.body);
 
-    authService.logout(refreshToken);
+    await authService.logout(refreshToken);
     res.status(204).send();
   } catch (error) {
     next(error);

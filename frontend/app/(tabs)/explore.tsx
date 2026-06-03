@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
+import type { DimensionValue } from 'react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BrandHeader, Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
@@ -51,8 +52,8 @@ export default function ExploreScreen() {
             style={[
               styles.pin,
               {
-                left: pin.x,
-                top: pin.y,
+                left: pin.x as DimensionValue,
+                top: pin.y as DimensionValue,
                 backgroundColor: selectedPin.id === pin.id ? theme.accentStrong : theme.surface,
                 borderColor: theme.accentStrong,
               },

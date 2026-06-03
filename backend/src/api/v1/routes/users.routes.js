@@ -18,10 +18,10 @@ usersV1Router.get('/me', requireAuth, (req, res) => {
   });
 });
 
-usersV1Router.patch('/me', requireAuth, (req, res, next) => {
+usersV1Router.patch('/me', requireAuth, async (req, res, next) => {
   try {
     const payload = validate(profileSchema, req.body);
-    const user = authService.updateProfile(req.user.id, payload);
+    const user = await authService.updateProfile(req.user.id, payload);
 
     res.json({ user });
   } catch (error) {
