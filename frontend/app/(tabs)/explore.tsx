@@ -1,16 +1,108 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import * as Location from 'expo-location';
+import { useEffect, useMemo, useState } from 'react';
 import type { DimensionValue } from 'react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BrandHeader, Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
-import { exploreCategories, fonts, mapExplorerPins, seasonThemes } from '@/constants/truefeed';
+import { fonts, mapExplorerPins, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { mapApi, type MapPlace } from '@/services/api/map';
+
+type LocationState = {
+  lat: number;
+  lng: number;
+} | null;
+
+function pinPosition(index: number) {
+  return mapExplorerPins[index % mapExplorerPins.length];
+}
 
 export default function ExploreScreen() {
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
-  const [selectedPin, setSelectedPin] = useState(mapExplorerPins[0]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [places, setPlaces] = useState<MapPlace[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
+  const [selectedPlace, setSelectedPlace] = useState<MapPlace | null>(null);
+  const [location, setLocation] = useState<LocationState>(null);
+  const [locationLabel, setLocationLabel] = useState('Activer GPS');
+
+  const visibleCategories = useMemo(
+    () => (categories.length > 0 ? categories : ['Temple', 'Food', 'Montagne']),
+    [categories],
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    mapApi
+      .listCategories()
+      .then((result) => {
+        if (isMounted) {
+          setCategories(result.items);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setCategories(['Temple', 'Food', 'Montagne']);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    mapApi
+      .listPlaces({
+        category: selectedCategory,
+        lat: location?.lat,
+        lng: location?.lng,
+        radiusKm: 250,
+      })
+      .then((result) => {
+        if (!isMounted) return;
+
+        setPlaces(result.items);
+        setSelectedPlace(
+          (current) => result.items.find((item) => item.id === current?.id) || result.items[0] || null,
+        );
+      })
+      .catch(() => {
+        if (!isMounted) return;
+
+        setPlaces([]);
+        setSelectedPlace(null);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [location?.lat, location?.lng, selectedCategory]);
+
+  async function enableLocation() {
+    setLocationLabel('GPS...');
+    const permission = await Location.requestForegroundPermissionsAsync();
+
+    if (permission.status !== 'granted') {
+      setLocationLabel('GPS refuse');
+      return;
+    }
+
+    const current = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+
+    setLocation({
+      lat: current.coords.latitude,
+      lng: current.coords.longitude,
+    });
+    setLocationLabel('Autour de moi');
+  }
 
   return (
     <ScreenShell theme={theme}>
@@ -33,56 +125,78 @@ export default function ExploreScreen() {
       </View>
 
       <View style={styles.categoryRow}>
-        {exploreCategories.map((category, index) => (
+        <Chip
+          label={locationLabel}
+          backgroundColor={location ? theme.accentStrong : theme.surface}
+          textColor={location ? '#FFFFFF' : theme.muted}
+          onPress={enableLocation}
+        />
+        {visibleCategories.map((category) => (
           <Chip
             key={category}
             label={category}
-            backgroundColor={index === 0 ? theme.accentStrong : theme.surface}
-            textColor={index === 0 ? '#FFFFFF' : theme.muted}
+            backgroundColor={selectedCategory === category ? theme.accentStrong : theme.surface}
+            textColor={selectedCategory === category ? '#FFFFFF' : theme.muted}
+            onPress={() =>
+              setSelectedCategory((current) => (current === category ? undefined : category))
+            }
           />
         ))}
       </View>
 
       <View style={[styles.map, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
         <View style={[styles.mapPath, { backgroundColor: theme.border }]} />
-        {mapExplorerPins.map((pin) => (
-          <Pressable
-            key={pin.id}
-            onPress={() => setSelectedPin(pin)}
-            style={[
-              styles.pin,
-              {
-                left: pin.x as DimensionValue,
-                top: pin.y as DimensionValue,
-                backgroundColor: selectedPin.id === pin.id ? theme.accentStrong : theme.surface,
-                borderColor: theme.accentStrong,
-              },
-            ]}
-          >
-            <Ionicons
-              name="location"
-              size={18}
-              color={selectedPin.id === pin.id ? '#FFFFFF' : theme.accentStrong}
-            />
-          </Pressable>
-        ))}
+        {places.map((place, index) => {
+          const position = pinPosition(index);
+
+          return (
+            <Pressable
+              key={place.id}
+              onPress={() => setSelectedPlace(place)}
+              style={[
+                styles.pin,
+                {
+                  left: position.x as DimensionValue,
+                  top: position.y as DimensionValue,
+                  backgroundColor: selectedPlace?.id === place.id ? theme.accentStrong : theme.surface,
+                  borderColor: theme.accentStrong,
+                },
+              ]}
+            >
+              <Ionicons
+                name="location"
+                size={18}
+                color={selectedPlace?.id === place.id ? '#FFFFFF' : theme.accentStrong}
+              />
+            </Pressable>
+          );
+        })}
       </View>
 
       <View
         style={[styles.placeCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
       >
         <View>
-          <Text style={[styles.placeName, { color: theme.text }]}>{selectedPin.name}</Text>
+          <Text style={[styles.placeName, { color: theme.text }]}>
+            {selectedPlace?.name || 'Aucun lieu'}
+          </Text>
           <Text style={[styles.placeMeta, { color: theme.muted }]}>
-            {selectedPin.category} · Kyoto
+            {selectedPlace
+              ? `${selectedPlace.category} · ${selectedPlace.city}${
+                  selectedPlace.distanceKm !== undefined ? ` · ${selectedPlace.distanceKm} km` : ''
+                }`
+              : 'Active le GPS ou change de categorie'}
           </Text>
         </View>
         <View style={[styles.score, { backgroundColor: theme.accentSoft }]}>
-          <Text style={[styles.scoreText, { color: theme.accentStrong }]}>{selectedPin.score}</Text>
+          <Text style={[styles.scoreText, { color: theme.accentStrong }]}>
+            {selectedPlace?.score?.toFixed(1) || '--'}
+          </Text>
         </View>
         <Text style={[styles.placeCopy, { color: theme.muted }]}>
-          Fiche lieu optimisee pour geoloc: categorie, score, tags et distance seront branches sur
-          API MapExplorer.
+          {selectedPlace
+            ? `Tags: ${selectedPlace.tags.join(', ') || 'aucun tag'}`
+            : 'Les lieux viennent de l API MapExplorer et sont tries par distance quand le GPS est actif.'}
         </Text>
       </View>
     </ScreenShell>

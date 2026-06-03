@@ -416,3 +416,21 @@ FROM (
   GROUP BY debate_threads.id
 ) AS counts
 WHERE debate_threads.id = counts.id;
+
+INSERT INTO places (name, category, city, lat, lng, score, tags)
+SELECT 'Fushimi Inari', 'Temple', 'Kyoto', 34.9671, 135.7727, 9.8, ARRAY['culture', 'budget', 'hanami']
+WHERE NOT EXISTS (
+  SELECT 1 FROM places WHERE lower(name) = lower('Fushimi Inari') AND lower(city) = lower('Kyoto')
+);
+
+INSERT INTO places (name, category, city, lat, lng, score, tags)
+SELECT 'Nishiki Market', 'Food', 'Kyoto', 35.005, 135.7647, 9.5, ARRAY['food', 'ville']
+WHERE NOT EXISTS (
+  SELECT 1 FROM places WHERE lower(name) = lower('Nishiki Market') AND lower(city) = lower('Kyoto')
+);
+
+INSERT INTO places (name, category, city, lat, lng, score, tags)
+SELECT 'Aiguille du Midi', 'Montagne', 'Chamonix', 45.8789, 6.8872, 9.4, ARRAY['montagne', 'neige']
+WHERE NOT EXISTS (
+  SELECT 1 FROM places WHERE lower(name) = lower('Aiguille du Midi') AND lower(city) = lower('Chamonix')
+);

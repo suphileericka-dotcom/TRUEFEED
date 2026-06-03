@@ -15,6 +15,11 @@
   - `DATABASE_URL`
   - `JWT_ACCESS_SECRET`
   - `JWT_REFRESH_SECRET`
+  - `AWS_REGION`
+  - `S3_BUCKET`
+  - `S3_PUBLIC_BASE_URL`
+  - `AWS_ACCESS_KEY_ID`
+  - `AWS_SECRET_ACCESS_KEY`
 - L'API refuse de demarrer en staging/prod si les secrets JWT manquent ou si CORS vaut `*`.
 
 ## Database Neon
