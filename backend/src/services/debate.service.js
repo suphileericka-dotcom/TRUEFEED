@@ -1,70 +1,100 @@
+const { query } = require('../data/db');
 const { createHttpError } = require('../utils/httpError');
 
-const threads = new Map();
-const replies = new Map();
-const votes = new Map();
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function createId(prefix) {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function seedThreads() {
-  if (threads.size > 0) {
-    return;
+function assertUuid(value, field = 'id') {
+  if (!uuidPattern.test(String(value))) {
+    throw createHttpError(400, 'invalid_id', `${field} invalide.`);
   }
-
-  [
-    {
-      title: 'Voyager avec 7kg max : liberte ou contrainte ?',
-      body: 'Le minimalisme rend-il le voyage plus fluide, ou sacrifie-t-on trop de confort ?',
-      tags: ['sac a dos', 'minimalisme'],
-      author: 'sophie_bpkt',
-      upVotes: 67,
-      downVotes: 33,
-    },
-    {
-      title: 'Slow travel ou tour intense pour un premier voyage ?',
-      body: 'Rester longtemps dans une ville donne une autre profondeur, mais le premier voyage donne envie de tout voir.',
-      tags: ['slowtravel', 'itineraire'],
-      author: 'maya_explores',
-      upVotes: 54,
-      downVotes: 46,
-    },
-  ].forEach((thread) => {
-    const now = new Date().toISOString();
-    const id = createId('thread');
-    threads.set(id, {
-      id,
-      repliesCount: 0,
-      createdAt: now,
-      updatedAt: now,
-      ...thread,
-    });
-  });
 }
 
-function listThreads() {
-  seedThreads();
-  return [...threads.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+function toIso(value) {
+  return value instanceof Date ? value.toISOString() : value;
 }
 
-function getThread(threadId) {
-  seedThreads();
-  const thread = threads.get(threadId);
+function normalizeTags(tags = []) {
+  return [...new Set(tags.map((tag) => String(tag).trim().toLowerCase()))]
+    .filter(Boolean)
+    .slice(0, 5);
+}
 
-  if (!thread) {
-    throw createHttpError(404, 'thread_not_found', 'Sujet introuvable.');
-  }
-
+function toThread(row) {
   return {
-    thread,
-    replies: [...replies.values()]
-      .filter((reply) => reply.threadId === threadId)
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    id: row.id,
+    authorId: row.author_id,
+    author: row.author_username,
+    title: row.title,
+    body: row.body,
+    tags: row.tags || [],
+    upVotes: row.up_votes,
+    downVotes: row.down_votes,
+    repliesCount: row.replies_count,
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
   };
 }
 
-function createThread(payload, user) {
+function toReply(row) {
+  return {
+    id: row.id,
+    threadId: row.thread_id,
+    authorId: row.author_id,
+    author: row.author_username,
+    body: row.body,
+    createdAt: toIso(row.created_at),
+  };
+}
+
+async function getThreadRow(threadId) {
+  assertUuid(threadId, 'threadId');
+
+  const result = await query(
+    `SELECT debate_threads.*, users.username AS author_username
+     FROM debate_threads
+     INNER JOIN users ON users.id = debate_threads.author_id
+     WHERE debate_threads.id = $1
+     LIMIT 1`,
+    [threadId],
+  );
+
+  if (result.rowCount === 0) {
+    throw createHttpError(404, 'thread_not_found', 'Sujet introuvable.');
+  }
+
+  return result.rows[0];
+}
+
+async function listThreads() {
+  const result = await query(
+    `SELECT debate_threads.*, users.username AS author_username
+     FROM debate_threads
+     INNER JOIN users ON users.id = debate_threads.author_id
+     ORDER BY debate_threads.updated_at DESC, debate_threads.created_at DESC
+     LIMIT 50`,
+  );
+
+  return result.rows.map(toThread);
+}
+
+async function getThread(threadId) {
+  const thread = toThread(await getThreadRow(threadId));
+  const repliesResult = await query(
+    `SELECT debate_replies.*, users.username AS author_username
+     FROM debate_replies
+     INNER JOIN users ON users.id = debate_replies.author_id
+     WHERE debate_replies.thread_id = $1
+     ORDER BY debate_replies.created_at ASC`,
+    [threadId],
+  );
+
+  return {
+    thread,
+    replies: repliesResult.rows.map(toReply),
+  };
+}
+
+async function createThread(payload, user) {
   const title = String(payload.title || '').trim();
   const body = String(payload.body || '').trim();
 
@@ -72,66 +102,57 @@ function createThread(payload, user) {
     throw createHttpError(400, 'invalid_thread', 'Titre ou contenu de debat trop court.');
   }
 
-  const now = new Date().toISOString();
-  const thread = {
-    id: createId('thread'),
-    title,
-    body,
-    tags: Array.isArray(payload.tags) ? payload.tags.slice(0, 5) : [],
-    authorId: user.id,
-    author: user.username,
-    upVotes: 0,
-    downVotes: 0,
-    repliesCount: 0,
-    createdAt: now,
-    updatedAt: now,
-  };
+  const result = await query(
+    `INSERT INTO debate_threads (author_id, title, body, tags)
+     VALUES ($1, $2, $3, $4)
+     RETURNING *`,
+    [user.id, title, body, normalizeTags(payload.tags)],
+  );
 
-  threads.set(thread.id, thread);
-  return thread;
+  return toThread({
+    ...result.rows[0],
+    author_username: user.username,
+  });
 }
 
-function addReply(threadId, payload, user) {
-  const { thread } = getThread(threadId);
+async function addReply(threadId, payload, user) {
+  await getThreadRow(threadId);
+
   const body = String(payload.body || '').trim();
 
   if (body.length < 2 || body.length > 1200) {
     throw createHttpError(400, 'invalid_reply', 'Reponse invalide.');
   }
 
-  const now = new Date().toISOString();
-  const reply = {
-    id: createId('reply'),
-    threadId,
-    authorId: user.id,
-    author: user.username,
-    body,
-    createdAt: now,
-  };
+  const result = await query(
+    `INSERT INTO debate_replies (thread_id, author_id, body)
+     VALUES ($1, $2, $3)
+     RETURNING *`,
+    [threadId, user.id, body],
+  );
 
-  replies.set(reply.id, reply);
-  thread.repliesCount += 1;
-  thread.updatedAt = now;
-  return reply;
+  await query(`UPDATE debate_threads SET updated_at = now() WHERE id = $1`, [threadId]);
+
+  return toReply({
+    ...result.rows[0],
+    author_username: user.username,
+  });
 }
 
-function vote(threadId, value, user) {
-  const { thread } = getThread(threadId);
+async function vote(threadId, value, user) {
+  await getThreadRow(threadId);
+
   const normalizedValue = value === 'down' ? 'down' : 'up';
-  const key = `${user.id}:${threadId}`;
-  const previous = votes.get(key);
 
-  if (previous === normalizedValue) {
-    return thread;
-  }
+  await query(
+    `INSERT INTO debate_votes (thread_id, user_id, value)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (thread_id, user_id)
+     DO UPDATE SET value = EXCLUDED.value`,
+    [threadId, user.id, normalizedValue],
+  );
 
-  if (previous === 'up') thread.upVotes -= 1;
-  if (previous === 'down') thread.downVotes -= 1;
-  if (normalizedValue === 'up') thread.upVotes += 1;
-  if (normalizedValue === 'down') thread.downVotes += 1;
-
-  votes.set(key, normalizedValue);
-  return thread;
+  return toThread(await getThreadRow(threadId));
 }
 
 module.exports = {

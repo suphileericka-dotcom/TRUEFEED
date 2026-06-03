@@ -15,14 +15,18 @@ const replySchema = {
   body: { type: 'string', required: true, minLength: 2, maxLength: 1200 },
 };
 
-debateV1Router.get('/threads', (_req, res) => {
-  res.json({ items: debateService.listThreads() });
+debateV1Router.get('/threads', async (_req, res, next) => {
+  try {
+    res.json({ items: await debateService.listThreads() });
+  } catch (error) {
+    next(error);
+  }
 });
 
-debateV1Router.post('/threads', requireAuth, (req, res, next) => {
+debateV1Router.post('/threads', requireAuth, async (req, res, next) => {
   try {
     const payload = validate(threadSchema, req.body);
-    const thread = debateService.createThread(
+    const thread = await debateService.createThread(
       { ...payload, tags: Array.isArray(req.body.tags) ? req.body.tags : [] },
       req.user,
     );
@@ -33,18 +37,18 @@ debateV1Router.post('/threads', requireAuth, (req, res, next) => {
   }
 });
 
-debateV1Router.get('/threads/:threadId', (req, res, next) => {
+debateV1Router.get('/threads/:threadId', async (req, res, next) => {
   try {
-    res.json(debateService.getThread(req.params.threadId));
+    res.json(await debateService.getThread(req.params.threadId));
   } catch (error) {
     next(error);
   }
 });
 
-debateV1Router.post('/threads/:threadId/replies', requireAuth, (req, res, next) => {
+debateV1Router.post('/threads/:threadId/replies', requireAuth, async (req, res, next) => {
   try {
     const payload = validate(replySchema, req.body);
-    const reply = debateService.addReply(req.params.threadId, payload, req.user);
+    const reply = await debateService.addReply(req.params.threadId, payload, req.user);
 
     res.status(201).json({ reply });
   } catch (error) {
@@ -52,9 +56,9 @@ debateV1Router.post('/threads/:threadId/replies', requireAuth, (req, res, next) 
   }
 });
 
-debateV1Router.post('/threads/:threadId/votes', requireAuth, (req, res, next) => {
+debateV1Router.post('/threads/:threadId/votes', requireAuth, async (req, res, next) => {
   try {
-    const thread = debateService.vote(req.params.threadId, req.body.value, req.user);
+    const thread = await debateService.vote(req.params.threadId, req.body.value, req.user);
 
     res.json({ thread });
   } catch (error) {
