@@ -1,41 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { BrandHeader, Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { MapExplorer } from '@/components/truefeed/map-explorer';
 import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 import { mapApi, type MapPlace } from '@/services/api/map';
+import { getCurrentLocation } from '@/services/location';
 
 type LocationState = {
   lat: number;
   lng: number;
 } | null;
-
-function getWebLocation() {
-  return new Promise<LocationState>((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('Geolocation unavailable.'));
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        resolve({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        });
-      },
-      reject,
-      {
-        enableHighAccuracy: false,
-        maximumAge: 60_000,
-        timeout: 10_000,
-      },
-    );
-  });
-}
 
 export default function ExploreScreen() {
   const { selectedSeason } = useGlobalSeason();
@@ -106,29 +83,7 @@ export default function ExploreScreen() {
   async function enableLocation() {
     try {
       setLocationLabel('GPS...');
-
-      if (Platform.OS === 'web') {
-        setLocation(await getWebLocation());
-        setLocationLabel('Autour de moi');
-        return;
-      }
-
-      const Location = await import('expo-location');
-      const permission = await Location.requestForegroundPermissionsAsync();
-
-      if (permission.status !== 'granted') {
-        setLocationLabel('GPS refuse');
-        return;
-      }
-
-      const current = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      setLocation({
-        lat: current.coords.latitude,
-        lng: current.coords.longitude,
-      });
+      setLocation(await getCurrentLocation());
       setLocationLabel('Autour de moi');
     } catch {
       setLocationLabel('GPS indispo');
