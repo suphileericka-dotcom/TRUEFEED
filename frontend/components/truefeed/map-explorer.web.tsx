@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { StyleSheet, View } from 'react-native';
 import type * as Leaflet from 'leaflet';
 
@@ -33,15 +33,24 @@ function getCenter(places: MapPlace[], selectedPlace: MapPlace | null): [number,
 }
 
 export function MapExplorer({ places, selectedPlace, theme, onSelectPlace }: MapExplorerProps) {
+  const [isClient, setIsClient] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
   const markersRef = useRef<Leaflet.Marker[]>([]);
   const center = useMemo(() => getCenter(places, selectedPlace), [places, selectedPlace]);
 
   useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
     let isMounted = true;
 
     async function setupMap() {
+      if (!isClient) {
+        return;
+      }
+
       if (!containerRef.current || mapRef.current) {
         return;
       }
@@ -64,6 +73,7 @@ export function MapExplorer({ places, selectedPlace, theme, onSelectPlace }: Map
 
       L.control.attribution({ position: 'bottomright' }).addTo(map);
       mapRef.current = map;
+      window.setTimeout(() => map.invalidateSize(), 0);
     }
 
     setupMap();
@@ -71,13 +81,13 @@ export function MapExplorer({ places, selectedPlace, theme, onSelectPlace }: Map
     return () => {
       isMounted = false;
     };
-  }, [center]);
+  }, [center, isClient]);
 
   useEffect(() => {
     async function syncMarkers() {
       const map = mapRef.current;
 
-      if (!map) {
+      if (!isClient || !map) {
         return;
       }
 
@@ -115,7 +125,18 @@ export function MapExplorer({ places, selectedPlace, theme, onSelectPlace }: Map
     }
 
     syncMarkers();
-  }, [center, onSelectPlace, places, selectedPlace, theme.accentStrong, theme.surface]);
+  }, [center, isClient, onSelectPlace, places, selectedPlace, theme.accentStrong, theme.surface]);
+
+  if (!isClient) {
+    return (
+      <View
+        style={[
+          styles.mapFrame,
+          { backgroundColor: theme.surfaceAlt, borderColor: theme.border },
+        ]}
+      />
+    );
+  }
 
   return (
     <View style={[styles.mapFrame, { borderColor: theme.border }]}>

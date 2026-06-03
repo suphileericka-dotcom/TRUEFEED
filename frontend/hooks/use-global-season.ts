@@ -1,4 +1,4 @@
-import { createContext, createElement, useContext, useState, type ReactNode } from 'react';
+import { createContext, createElement, useContext, useEffect, useState, type ReactNode } from 'react';
 
 import { getSeasonFromDate, type SeasonKey } from '@/constants/truefeed';
 
@@ -10,7 +10,11 @@ type GlobalSeasonContextValue = {
 const GlobalSeasonContext = createContext<GlobalSeasonContextValue | null>(null);
 
 export function GlobalSeasonProvider({ children }: { children: ReactNode }) {
-  const [selectedSeason, setSelectedSeason] = useState<SeasonKey>(getSeasonFromDate());
+  const [selectedSeason, setSelectedSeason] = useState<SeasonKey>('summer');
+
+  useEffect(() => {
+    setSelectedSeason(getSeasonFromDate());
+  }, []);
 
   return createElement(
     GlobalSeasonContext.Provider,
@@ -24,7 +28,7 @@ export function useGlobalSeason() {
 
   if (!context) {
     return {
-      selectedSeason: getSeasonFromDate(),
+      selectedSeason: 'summer' as SeasonKey,
       setSelectedSeason: () => undefined,
     };
   }
