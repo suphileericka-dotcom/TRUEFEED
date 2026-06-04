@@ -1,6 +1,7 @@
 import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { BrandHeader, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
@@ -12,9 +13,9 @@ export default function SignupScreen() {
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
   const { signIn } = useSession();
-  const [displayName, setDisplayName] = useState('Suphile NTSIMBA');
-  const [username, setUsername] = useState('suphile');
-  const [email, setEmail] = useState('nsuphile@gmail.com');
+  const [displayName, setDisplayName] = useState('');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState('');
 
@@ -41,6 +42,9 @@ export default function SignupScreen() {
 
   return (
     <ScreenShell theme={theme}>
+      <View style={styles.topRow}>
+        <Ionicons name="arrow-back" size={22} color={theme.text} onPress={() => router.back()} />
+      </View>
       <BrandHeader theme={theme} badgeText="Inscription" badgeIcon="+" />
       <SectionLabel theme={theme} label="Nouveau profil" />
 
@@ -99,6 +103,7 @@ export default function SignupScreen() {
 }
 
 const styles = StyleSheet.create({
+  topRow: { alignItems: 'center', flexDirection: 'row' },
   card: { alignItems: 'stretch', borderRadius: 28, borderWidth: 1, gap: 14, padding: 20 },
   avatar: {
     alignItems: 'center',
