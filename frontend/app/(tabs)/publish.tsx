@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
   BrandHeader,
@@ -37,6 +38,8 @@ export default function PublishScreen() {
     'Spot prefere du moment, lumiere parfaite et petite astuce budget a partager avec la commu.',
   );
   const [selectedTags, setSelectedTags] = useState<string[]>(['ville', 'food']);
+  const [selectedModules, setSelectedModules] = useState<string[]>([]);
+  const [selectedMediaUri, setSelectedMediaUri] = useState<string | null>(null);
   const [publishState, setPublishState] = useState<PublishState>('idle');
   const [showPublishModal, setShowPublishModal] = useState(false);
 
@@ -49,6 +52,55 @@ export default function PublishScreen() {
     setSelectedTags((current) =>
       current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag],
     );
+  }
+
+  function toggleModule(label: string) {
+    setSelectedModules((current) =>
+      current.includes(label) ? current.filter((item) => item !== label) : [...current, label],
+    );
+  }
+
+  async function pickMedia(nextMediaType = mediaType) {
+    if (nextMediaType === 'text') {
+      setMediaType(nextMediaType);
+      setSelectedMediaUri(null);
+      return;
+    }
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      setPublishState('idle');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: false,
+      mediaTypes:
+        nextMediaType === 'video'
+          ? ImagePicker.MediaTypeOptions.Videos
+          : ImagePicker.MediaTypeOptions.Images,
+      quality: 0.85,
+      videoMaxDuration: 90,
+    });
+
+    setMediaType(nextMediaType);
+
+    if (!result.canceled && result.assets[0]) {
+      setSelectedMediaUri(result.assets[0].uri);
+    }
+  }
+
+  async function shareDraft() {
+    await Share.share({
+      title,
+      message: `${title}\n${location}\n\n${caption}`,
+    }).catch(() => undefined);
+  }
+
+  function publishPost() {
+    setPublishState('published');
+    setShowPublishModal(false);
   }
 
   return (
@@ -76,7 +128,11 @@ export default function PublishScreen() {
         <View style={styles.mediaPreview}>
           <Ionicons name={activeMedia?.icon ?? 'image-outline'} size={58} color="#FFFFFF" />
           <Text style={styles.mediaPreviewText}>
-            {mediaType === 'text' ? 'Post texte enrichi' : 'Apercu pret pour upload'}
+            {mediaType === 'text'
+              ? 'Post texte enrichi'
+              : selectedMediaUri
+                ? 'Media selectionne'
+                : 'Choisis une photo ou une video'}
           </Text>
         </View>
 
@@ -84,7 +140,7 @@ export default function PublishScreen() {
           options={publishMediaOptions}
           selectedKey={mediaType}
           theme={theme}
-          onSelect={setMediaType}
+          onSelect={(key) => pickMedia(key)}
         />
       </View>
 
@@ -176,20 +232,25 @@ export default function PublishScreen() {
         <Text style={[styles.label, { color: theme.text }]}>Modules</Text>
         <View style={styles.attachmentGrid}>
           {attachmentOptions.map((item) => (
-            <View
+            <Pressable
               key={item.label}
+              onPress={() => toggleModule(item.label)}
               style={[
                 styles.attachmentCard,
                 {
-                  backgroundColor: theme.surfaceAlt,
-                  borderColor: theme.border,
+                  backgroundColor: selectedModules.includes(item.label)
+                    ? theme.accentSoft
+                    : theme.surfaceAlt,
+                  borderColor: selectedModules.includes(item.label)
+                    ? theme.accentStrong
+                    : theme.border,
                 },
               ]}
             >
               <Text style={styles.attachmentIcon}>{item.icon}</Text>
               <Text style={[styles.attachmentTitle, { color: theme.text }]}>{item.label}</Text>
               <Text style={[styles.attachmentDetail, { color: theme.muted }]}>{item.detail}</Text>
-            </View>
+            </Pressable>
           ))}
         </View>
 
@@ -229,15 +290,13 @@ export default function PublishScreen() {
 
       <View style={styles.actions}>
         <Pressable
-          onPress={() => setPublishState('draft')}
+          onPress={shareDraft}
           style={[
             styles.secondaryButton,
             { borderColor: theme.border, backgroundColor: theme.surface },
           ]}
         >
-          <Text style={[styles.secondaryButtonText, { color: theme.text }]}>
-            Enregistrer brouillon
-          </Text>
+          <Text style={[styles.secondaryButtonText, { color: theme.text }]}>Partager</Text>
         </Pressable>
         <Pressable
           onPress={() => setShowPublishModal(true)}
@@ -277,10 +336,7 @@ export default function PublishScreen() {
         secondaryLabel="Annuler"
         primaryLabel="Publier"
         onClose={() => setShowPublishModal(false)}
-        onPrimary={() => {
-          setPublishState('published');
-          setShowPublishModal(false);
-        }}
+        onPrimary={publishPost}
       />
     </ScreenShell>
   );

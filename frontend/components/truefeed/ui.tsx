@@ -30,6 +30,7 @@ type ScreenShellProps = {
 type HeaderAction = {
   icon: ComponentProps<typeof Ionicons>['name'];
   tint?: string;
+  onPress?: () => void;
 };
 
 type BrandHeaderProps = {
@@ -148,8 +149,9 @@ export function BrandHeader({ theme, badgeText, badgeIcon, actions = [] }: Brand
 
         <View style={styles.headerActions}>
           {actions.map((action) => (
-            <View
+            <Pressable
               key={action.icon}
+              onPress={action.onPress}
               style={[
                 styles.headerActionBubble,
                 {
@@ -158,7 +160,7 @@ export function BrandHeader({ theme, badgeText, badgeIcon, actions = [] }: Brand
               ]}
             >
               <Ionicons name={action.icon} size={18} color={action.tint ?? theme.accentStrong} />
-            </View>
+            </Pressable>
           ))}
         </View>
       </View>

@@ -17,6 +17,10 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)/forgot" />
         <Stack.Screen name="post/[id]" />
         <Stack.Screen name="profile/[id]" />
+        <Stack.Screen name="messages" />
+        <Stack.Screen name="notifications" />
+        <Stack.Screen name="settings" />
+        <Stack.Screen name="onboarding" />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
     </GlobalSeasonProvider>

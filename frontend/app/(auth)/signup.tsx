@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -46,7 +46,10 @@ export default function SignupScreen() {
           style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
         />
 
-        <Pressable style={[styles.primary, { backgroundColor: theme.accentStrong }]}>
+        <Pressable
+          onPress={() => router.replace('/onboarding')}
+          style={[styles.primary, { backgroundColor: theme.accentStrong }]}
+        >
           <Text style={styles.primaryText}>Creer le compte</Text>
         </Pressable>
         <Link href="/login">

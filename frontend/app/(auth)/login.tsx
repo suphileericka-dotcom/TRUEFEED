@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -41,7 +41,10 @@ export default function LoginScreen() {
           value={password}
         />
 
-        <Pressable style={[styles.primary, { backgroundColor: theme.accentStrong }]}>
+        <Pressable
+          onPress={() => router.replace('/(tabs)')}
+          style={[styles.primary, { backgroundColor: theme.accentStrong }]}
+        >
           <Text style={styles.primaryText}>Se connecter</Text>
         </Pressable>
 

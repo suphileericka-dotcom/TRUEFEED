@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { memo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import { BrandHeader, Chip, SeasonSwitcher, SectionLabel } from '@/components/truefeed/ui';
 import { feedBySeason, fonts, seasonThemes, storyUsers } from '@/constants/truefeed';
@@ -118,7 +118,15 @@ const FeedCard = memo(function FeedCard({
         <Pressable onPress={() => router.push({ pathname: '/post/[id]', params: { id: post.id } })}>
           <Ionicons name="chatbubble-outline" size={22} color={theme.muted} />
         </Pressable>
-        <Pressable onPress={() => setShared(true)}>
+        <Pressable
+          onPress={() => {
+            setShared(true);
+            Share.share({
+              message: `${post.title} - ${post.caption}`,
+              title: post.title,
+            }).catch(() => undefined);
+          }}
+        >
           <Ionicons
             name="airplane-outline"
             size={22}
@@ -166,7 +174,10 @@ export default function HomeScreen() {
               theme={theme}
               badgeText={feed.chip}
               badgeIcon={theme.emoji}
-              actions={[{ icon: 'person-circle' }, { icon: 'mail' }]}
+              actions={[
+                { icon: 'person-circle', onPress: () => router.push('/settings') },
+                { icon: 'mail', onPress: () => router.push('/messages') },
+              ]}
             />
             <SeasonSwitcher selectedSeason={selectedSeason} onSelect={setSelectedSeason} />
             <SectionLabel theme={theme} label={`Feed vertical - ${theme.label}`} />
