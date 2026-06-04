@@ -2,9 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { memo, useState } from 'react';
-import { FlatList, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import {
+  FlatList,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
-import { BrandHeader, Chip } from '@/components/truefeed/ui';
+import { BrandHeader, Chip, TruefeedModal } from '@/components/truefeed/ui';
 import { feedBySeason, fonts, seasonThemes, storyUsers } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 
@@ -153,6 +161,9 @@ export default function HomeScreen() {
   const [sort, setSort] = useState<'recent' | 'popular'>('recent');
   const [activeTag, setActiveTag] = useState('Tous');
   const [hasOwnStory, setHasOwnStory] = useState(false);
+  const [showStoryComposer, setShowStoryComposer] = useState(false);
+  const [storyText, setStoryText] = useState('');
+  const [storyMediaType, setStoryMediaType] = useState<'image' | 'video' | null>(null);
   const theme = seasonThemes[selectedSeason];
   const feed = feedBySeason[selectedSeason];
   const tagOptions = ['Tous', 'BonPlan', 'VlogFeed', 'TrueDebate'];
@@ -160,7 +171,7 @@ export default function HomeScreen() {
     .filter((post) => activeTag === 'Tous' || post.tag === activeTag)
     .sort((a, b) => (sort === 'popular' ? b.likes - a.likes : 0));
 
-  async function createStory() {
+  async function pickStoryMedia() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
@@ -174,8 +185,17 @@ export default function HomeScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setHasOwnStory(true);
+      setStoryMediaType(result.assets[0].type === 'video' ? 'video' : 'image');
     }
+  }
+
+  function publishStory() {
+    if (!storyText.trim() && !storyMediaType) {
+      return;
+    }
+
+    setHasOwnStory(true);
+    setShowStoryComposer(false);
   }
 
   return (
@@ -232,7 +252,7 @@ export default function HomeScreen() {
               ))}
             </View>
             <View style={styles.storyRow}>
-              <Pressable onPress={createStory} style={styles.storyItem}>
+              <Pressable onPress={() => setShowStoryComposer(true)} style={styles.storyItem}>
                 <View
                   style={[
                     styles.storyCircle,
@@ -267,6 +287,46 @@ export default function HomeScreen() {
         }
         renderItem={({ item }) => <FeedCard post={item} theme={theme} />}
       />
+
+      <TruefeedModal
+        visible={showStoryComposer}
+        theme={theme}
+        title="Nouvelle story"
+        message="Ajoute un media, un texte, ou les deux."
+        secondaryLabel="Annuler"
+        primaryLabel="Publier"
+        onClose={() => setShowStoryComposer(false)}
+        onPrimary={publishStory}
+      >
+        <View style={[styles.storyComposerPreview, { backgroundColor: theme.accentStrong }]}>
+          <Text style={styles.storyComposerKicker}>
+            {storyMediaType ? (storyMediaType === 'video' ? 'Video' : 'Photo') : 'Texte'}
+          </Text>
+          <Text style={styles.storyComposerText}>
+            {storyText.trim() || 'Ecris quelque chose sur ta story'}
+          </Text>
+        </View>
+        <TextInput
+          multiline
+          value={storyText}
+          onChangeText={setStoryText}
+          placeholder="Texte de ta story..."
+          placeholderTextColor={theme.muted}
+          style={[
+            styles.storyTextInput,
+            { backgroundColor: theme.surfaceAlt, color: theme.text, borderColor: theme.border },
+          ]}
+        />
+        <Pressable
+          onPress={pickStoryMedia}
+          style={[styles.storyMediaButton, { backgroundColor: theme.surfaceAlt }]}
+        >
+          <Ionicons name="image-outline" size={20} color={theme.accentStrong} />
+          <Text style={[styles.storyMediaButtonText, { color: theme.text }]}>
+            Choisir photo/video
+          </Text>
+        </Pressable>
+      </TruefeedModal>
     </View>
   );
 }
@@ -293,6 +353,44 @@ const styles = StyleSheet.create({
     width: 26,
   },
   storyName: { fontFamily: fonts.body, fontSize: 13, fontWeight: '700' },
+  storyComposerPreview: {
+    borderRadius: 22,
+    minHeight: 220,
+    justifyContent: 'flex-end',
+    gap: 10,
+    padding: 18,
+  },
+  storyComposerKicker: {
+    color: 'rgba(255,255,255,0.75)',
+    fontFamily: fonts.body,
+    fontSize: 13,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  storyComposerText: {
+    color: '#FFFFFF',
+    fontFamily: fonts.title,
+    fontSize: 32,
+    fontWeight: '700',
+  },
+  storyTextInput: {
+    borderRadius: 18,
+    borderWidth: 1,
+    fontFamily: fonts.body,
+    fontSize: 16,
+    minHeight: 92,
+    padding: 14,
+    textAlignVertical: 'top',
+  },
+  storyMediaButton: {
+    alignItems: 'center',
+    borderRadius: 16,
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'center',
+    paddingVertical: 14,
+  },
+  storyMediaButtonText: { fontFamily: fonts.body, fontSize: 14, fontWeight: '900' },
   postCard: { borderRadius: 28, borderWidth: 1, overflow: 'hidden' },
   postHeader: {
     alignItems: 'center',
