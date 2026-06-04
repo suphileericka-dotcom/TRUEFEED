@@ -158,14 +158,15 @@ export default function DebateScreen() {
             <Text style={[styles.detailTitle, { color: theme.text }]}>Thread</Text>
             <Text style={[styles.detailViews, { color: theme.muted }]}>6,9 K vues</Text>
           </View>
-          <Ionicons name="notifications-outline" size={25} color={theme.text} />
+          <Pressable onPress={() => router.push('/notifications')}>
+            <Ionicons name="notifications-outline" size={25} color={theme.text} />
+          </Pressable>
         </View>
 
         {renderThread(selectedTopic, true)}
 
         <View style={styles.detailFilterRow}>
           <Text style={[styles.detailFilter, { color: theme.text }]}>Populaire</Text>
-          <Text style={[styles.detailActivity, { color: theme.muted }]}>Voir l activite</Text>
         </View>
 
         {localReplies.map((item, index) => (
@@ -319,7 +320,6 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
   detailFilter: { fontFamily: fonts.body, fontSize: 20, fontWeight: '900' },
-  detailActivity: { fontFamily: fonts.body, fontSize: 18, fontWeight: '800' },
   replyPost: { alignItems: 'flex-start', flexDirection: 'row', gap: 12 },
   replyAvatar: {
     alignItems: 'center',
