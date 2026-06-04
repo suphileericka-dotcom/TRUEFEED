@@ -1,323 +1,228 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { router } from 'expo-router';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
-import { bonPlanCategories, destinationSpotlight, fonts, seasonThemes } from '@/constants/truefeed';
+import { ScreenShell, TruefeedModal } from '@/components/truefeed/ui';
+import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { useSession } from '@/hooks/use-session';
+
+const badgeMilestones = [5, 10, 15, 20, 25, 30, 33, 35, 50, 75];
+
+const gifts = [
+  { unlockAt: 2, name: 'Confettis', stock: 3, detail: "Confettis sur l'ecran d'une personne." },
+  { unlockAt: 4, name: 'Emoji Geant', stock: 5, detail: "Emoji plein ecran chez le destinataire." },
+  { unlockAt: 6, name: 'Applaudissements', stock: 3, detail: "Animation d'applaudissements sur un post." },
+  { unlockAt: 8, name: 'Meteo Mood', stock: 2, detail: 'Meteo animee selon ton humeur.' },
+  { unlockAt: 11, name: 'Surnom Secret', stock: 2, detail: 'Surnom visible entre deux personnes.' },
+  { unlockAt: 13, name: 'Fausse Alerte', stock: 1, detail: 'Notification rigolote a un ami.' },
+  { unlockAt: 16, name: 'Relance Fantome', stock: 2, detail: "Renvoie un message discretement." },
+  { unlockAt: 18, name: 'Grimace Party', stock: 1, detail: 'Emoji souriant pendant 3 secondes.' },
+  { unlockAt: 22, name: 'Boost Visibilite', stock: 2, detail: 'Post en tete du feed pendant 24h.' },
+  { unlockAt: 24, name: 'Archiviste', stock: 3, detail: 'Sauvegarde un post dans ta collection.' },
+  { unlockAt: 25, name: 'Mystique Charme', stock: 2, detail: "Message a quelqu'un qui ne te suit pas." },
+  { unlockAt: 27, name: 'Time Capsule', stock: 1, detail: 'Message programme dans 7 jours.' },
+  { unlockAt: 29, name: 'Mode Fantome', stock: 1, detail: 'Invisible dans vu recemment pendant 1h.' },
+  { unlockAt: 31, name: 'Traducteur Universel', stock: 1, detail: 'Traduit une conversation en 1 clic.' },
+  { unlockAt: 34, name: 'Recap Magique', stock: 1, detail: 'Resume rigolo de ton activite.' },
+];
+
+const initialPlans = [
+  { place: 'Fushimi Inari', budget: '0 EUR', transport: 'Train', rating: 9.8, author: 'nora.nomad' },
+  { place: 'Nishiki Market', budget: '15 EUR', transport: 'Metro', rating: 9.5, author: 'maya_explores' },
+  { place: 'Montmartre', budget: '8 EUR', transport: 'Metro', rating: 9.4, author: 'lucas.trips' },
+];
 
 export default function BonPlanScreen() {
   const { selectedSeason } = useGlobalSeason();
+  const { isAuthenticated } = useSession();
   const theme = seasonThemes[selectedSeason];
-  const [planTitle, setPlanTitle] = useState('');
-  const [category, setCategory] = useState(bonPlanCategories[0]);
+  const [plans, setPlans] = useState(initialPlans);
+  const [place, setPlace] = useState('');
   const [budget, setBudget] = useState('');
-  const canSubmit = planTitle.trim().length >= 3 && budget.trim().length >= 1;
+  const [transport, setTransport] = useState('');
+  const [selectedGift, setSelectedGift] = useState<(typeof gifts)[number] | null>(null);
+  const sharedCount = plans.length;
+  const canSubmit = place.trim().length >= 2 && budget.trim().length >= 1 && transport.trim().length >= 2;
+  const nextBadge = badgeMilestones.find((milestone) => milestone > sharedCount);
+  const sortedPlans = useMemo(() => [...plans].sort((a, b) => b.rating - a.rating), [plans]);
+
+  function addPlan() {
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+
+    if (!canSubmit) {
+      return;
+    }
+
+    setPlans((current) => [
+      { place, budget, transport, rating: 8.9, author: 'toi' },
+      ...current,
+    ]);
+    setPlace('');
+    setBudget('');
+    setTransport('');
+  }
 
   return (
     <ScreenShell theme={theme}>
-      <SectionLabel theme={theme} label={`Fiche destination - ${theme.label}`} />
-
-      <View
-        style={[
-          styles.hero,
-          {
-            backgroundColor: theme.accentStrong,
-          },
-        ]}
-      >
-        <View style={styles.heroTop}>
-          <View style={[styles.heroIconBubble, { backgroundColor: 'rgba(60, 28, 14, 0.26)' }]}>
-            <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-          </View>
-
-          <Chip
-            label={`Mode ${theme.label}`}
-            icon={theme.emoji}
-            backgroundColor="rgba(60, 28, 14, 0.26)"
-            textColor="#FFFFFF"
-          />
-
-          <View style={[styles.heroIconBubble, { backgroundColor: 'rgba(60, 28, 14, 0.26)' }]}>
-            <Ionicons name="sparkles" size={20} color="#FF8FB7" />
-          </View>
+      <View style={[styles.headerCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <Text style={[styles.title, { color: theme.text }]}>Bon Plan</Text>
+        <Text style={[styles.copy, { color: theme.muted }]}>
+          Lieux partages autour de toi, classes par note et proposes selon ta localisation.
+        </Text>
+        <View style={styles.statsRow}>
+          <Stat label="Partages" value={String(sharedCount)} color={theme.accentStrong} />
+          <Stat label="Badge suivant" value={nextBadge ? `${nextBadge}` : '75+'} color={theme.accentStrong} />
+          <Stat label="Cadeaux" value={String(gifts.filter((gift) => sharedCount >= gift.unlockAt).length)} color={theme.accentStrong} />
         </View>
-
-        <Text style={styles.heroEmoji}>{theme.emoji}</Text>
-        <Text style={styles.city}>{destinationSpotlight.city}</Text>
-        <Text style={styles.region}>{destinationSpotlight.region}</Text>
       </View>
 
-      <View
-        style={[
-          styles.metrics,
-          {
-            backgroundColor: theme.surface,
-            borderColor: theme.border,
-          },
-        ]}
-      >
-        <MetricBlock
-          themeColor={theme.accentStrong}
-          label="Note"
-          value={destinationSpotlight.rating}
+      <View style={[styles.formCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Ajouter un bon plan</Text>
+        <TextInput
+          value={place}
+          onChangeText={setPlace}
+          placeholder="Lieu"
+          placeholderTextColor={theme.muted}
+          style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
         />
-        <MetricBlock
-          themeColor={theme.accentStrong}
-          label="Posts"
-          value={destinationSpotlight.posts}
+        <TextInput
+          value={budget}
+          onChangeText={setBudget}
+          placeholder="Budget, ex: 12 EUR"
+          placeholderTextColor={theme.muted}
+          style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
         />
-        <MetricBlock
-          themeColor={theme.accentStrong}
-          label="BonPlans"
-          value={destinationSpotlight.plans}
+        <TextInput
+          value={transport}
+          onChangeText={setTransport}
+          placeholder="Transport utilise"
+          placeholderTextColor={theme.muted}
+          style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
         />
-      </View>
-
-      <View
-        style={[
-          styles.tipCard,
-          {
-            backgroundColor: theme.surfaceAlt,
-            borderLeftColor: theme.accentStrong,
-          },
-        ]}
-      >
-        <Text style={[styles.tipLabel, { color: theme.accentStrong }]}>Conseil {theme.label}</Text>
-        <Text style={[styles.tipText, { color: theme.text }]}>{destinationSpotlight.tip}</Text>
-      </View>
-
-      <Text style={[styles.blockTitle, { color: theme.text }]}>BonPlans nearby</Text>
-
-      {destinationSpotlight.nearby.map((spot) => (
-        <View
-          key={spot.name}
-          style={[
-            styles.nearbyCard,
-            {
-              backgroundColor: theme.surface,
-              borderColor: theme.border,
-            },
-          ]}
+        <Pressable
+          onPress={addPlan}
+          style={[styles.submitButton, { backgroundColor: canSubmit ? theme.accentStrong : theme.border }]}
         >
-          <View style={styles.nearbyLeft}>
-            <Text style={styles.nearbyIcon}>{spot.icon}</Text>
-            <View>
-              <Text style={[styles.nearbyName, { color: theme.text }]}>{spot.name}</Text>
-              <Text style={[styles.nearbyMeta, { color: theme.muted }]}>{spot.type}</Text>
-            </View>
+          <Text style={styles.submitText}>Partager le bon plan</Text>
+        </Pressable>
+      </View>
+
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>Lieux proches</Text>
+      {sortedPlans.map((plan) => (
+        <View key={`${plan.place}-${plan.author}`} style={[styles.planCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={styles.planCopy}>
+            <Text style={[styles.planTitle, { color: theme.text }]}>{plan.place}</Text>
+            <Text style={[styles.planMeta, { color: theme.muted }]}>
+              {plan.budget} - {plan.transport} - par {plan.author}
+            </Text>
           </View>
-          <View style={[styles.scorePill, { backgroundColor: theme.accentSoft }]}>
-            <Text style={[styles.scoreText, { color: theme.accentStrong }]}>{spot.score}</Text>
+          <View style={[styles.ratingPill, { backgroundColor: theme.accentSoft }]}>
+            <Text style={[styles.ratingText, { color: theme.accentStrong }]}>{plan.rating}</Text>
           </View>
         </View>
       ))}
 
-      <View
-        style={[styles.formCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
-      >
-        <Text style={[styles.blockTitle, { color: theme.text }]}>Ajouter un bon plan</Text>
-        <TextInput
-          onChangeText={setPlanTitle}
-          placeholder="Nom du spot"
-          placeholderTextColor={theme.muted}
-          style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
-          value={planTitle}
-        />
-        <View style={styles.categoryRow}>
-          {bonPlanCategories.map((item) => (
-            <Chip
-              key={item}
-              label={item}
-              active={category === item}
-              backgroundColor={category === item ? theme.accentSoft : theme.surfaceAlt}
-              textColor={category === item ? theme.accentStrong : theme.muted}
-              onPress={() => setCategory(item)}
-            />
-          ))}
-        </View>
-        <TextInput
-          onChangeText={setBudget}
-          placeholder="Budget estime, ex: 12 EUR"
-          placeholderTextColor={theme.muted}
-          style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
-          value={budget}
-        />
-        <Pressable
-          style={[
-            styles.submitButton,
-            { backgroundColor: canSubmit ? theme.accentStrong : theme.border },
-          ]}
-        >
-          <Text style={styles.submitText}>
-            {canSubmit ? 'Proposer le bon plan' : 'Complete le formulaire'}
-          </Text>
-        </Pressable>
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>Badges</Text>
+      <View style={styles.badgeGrid}>
+        {badgeMilestones.map((milestone, index) => {
+          const unlocked = sharedCount >= milestone;
+          return (
+            <View
+              key={milestone}
+              style={[
+                styles.badgeCard,
+                { backgroundColor: unlocked ? theme.accentSoft : theme.surfaceAlt, borderColor: theme.border },
+              ]}
+            >
+              <Ionicons name="ribbon" size={20} color={unlocked ? theme.accentStrong : theme.muted} />
+              <Text style={[styles.badgeText, { color: unlocked ? theme.accentStrong : theme.muted }]}>
+                Badge {index + 1}
+              </Text>
+              <Text style={[styles.badgeMeta, { color: theme.muted }]}>{milestone} plans</Text>
+            </View>
+          );
+        })}
       </View>
+
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>Cadeaux</Text>
+      <View style={styles.giftGrid}>
+        {gifts.map((gift) => {
+          const unlocked = sharedCount >= gift.unlockAt;
+          return (
+            <Pressable
+              key={gift.name}
+              onPress={() => unlocked && setSelectedGift(gift)}
+              style={[
+                styles.giftCard,
+                {
+                  backgroundColor: unlocked ? theme.surface : theme.surfaceAlt,
+                  borderColor: unlocked ? theme.accentStrong : theme.border,
+                  opacity: unlocked ? 1 : 0.52,
+                },
+              ]}
+            >
+              <Text style={[styles.giftName, { color: unlocked ? theme.text : theme.muted }]}>{gift.name}</Text>
+              <Text style={[styles.giftStock, { color: theme.accentStrong }]}>
+                {unlocked ? `${gift.stock}x` : `${gift.unlockAt} plans`}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <TruefeedModal
+        visible={Boolean(selectedGift)}
+        theme={theme}
+        title={selectedGift?.name ?? ''}
+        message={selectedGift?.detail}
+        secondaryLabel="Annuler"
+        primaryLabel="Utiliser"
+        onClose={() => setSelectedGift(null)}
+        onPrimary={() => setSelectedGift(null)}
+      />
     </ScreenShell>
   );
 }
 
-function MetricBlock({
-  label,
-  value,
-  themeColor,
-}: {
-  label: string;
-  value: string;
-  themeColor: string;
-}) {
+function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <View style={styles.metricBlock}>
-      <Text style={[styles.metricValue, { color: themeColor }]}>{value}</Text>
-      <Text style={styles.metricLabel}>{label}</Text>
+    <View style={styles.stat}>
+      <Text style={[styles.statValue, { color }]}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    borderRadius: 34,
-    gap: 10,
-    padding: 22,
-  },
-  heroTop: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  heroIconBubble: {
-    alignItems: 'center',
-    borderRadius: 22,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
-  heroEmoji: {
-    alignSelf: 'center',
-    fontSize: 90,
-    marginVertical: 38,
-  },
-  city: {
-    color: '#FFFFFF',
-    fontFamily: fonts.title,
-    fontSize: 46,
-    fontWeight: '700',
-  },
-  region: {
-    color: '#F9E7DD',
-    fontFamily: fonts.body,
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  metrics: {
-    borderRadius: 28,
-    borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 18,
-  },
-  metricBlock: {
-    alignItems: 'center',
-    flex: 1,
-    gap: 4,
-  },
-  metricValue: {
-    fontFamily: fonts.title,
-    fontSize: 34,
-    fontWeight: '700',
-  },
-  metricLabel: {
-    color: '#9A7C6A',
-    fontFamily: fonts.body,
-    fontSize: 14,
-  },
-  tipCard: {
-    borderLeftWidth: 4,
-    borderRadius: 24,
-    gap: 10,
-    padding: 20,
-  },
-  tipLabel: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-  },
-  tipText: {
-    fontFamily: fonts.body,
-    fontSize: 16,
-    lineHeight: 28,
-  },
-  blockTitle: {
-    fontFamily: fonts.title,
-    fontSize: 34,
-    fontWeight: '700',
-  },
-  nearbyCard: {
-    alignItems: 'center',
-    borderRadius: 24,
-    borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 18,
-  },
-  nearbyLeft: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 16,
-  },
-  nearbyIcon: {
-    fontSize: 28,
-  },
-  nearbyName: {
-    fontFamily: fonts.body,
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  nearbyMeta: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    marginTop: 4,
-  },
-  scorePill: {
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  scoreText: {
-    fontFamily: fonts.body,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  formCard: {
-    borderRadius: 28,
-    borderWidth: 1,
-    gap: 14,
-    padding: 18,
-  },
-  input: {
-    borderRadius: 18,
-    fontFamily: fonts.body,
-    fontSize: 16,
-    padding: 15,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  submitButton: {
-    alignItems: 'center',
-    borderRadius: 18,
-    paddingVertical: 15,
-  },
-  submitText: {
-    color: '#FFFFFF',
-    fontFamily: fonts.body,
-    fontSize: 15,
-    fontWeight: '800',
-  },
+  headerCard: { borderRadius: 28, borderWidth: 1, gap: 12, padding: 20 },
+  title: { fontFamily: fonts.title, fontSize: 44, fontWeight: '700' },
+  copy: { fontFamily: fonts.body, fontSize: 15, lineHeight: 23 },
+  statsRow: { flexDirection: 'row', gap: 10 },
+  stat: { alignItems: 'center', flex: 1, gap: 4 },
+  statValue: { fontFamily: fonts.title, fontSize: 30, fontWeight: '700' },
+  statLabel: { color: '#8A7A66', fontFamily: fonts.body, fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  formCard: { borderRadius: 28, borderWidth: 1, gap: 12, padding: 18 },
+  sectionTitle: { fontFamily: fonts.title, fontSize: 32, fontWeight: '700' },
+  input: { borderRadius: 18, fontFamily: fonts.body, fontSize: 16, padding: 15 },
+  submitButton: { alignItems: 'center', borderRadius: 18, paddingVertical: 15 },
+  submitText: { color: '#FFFFFF', fontFamily: fonts.body, fontSize: 15, fontWeight: '900' },
+  planCard: { alignItems: 'center', borderRadius: 24, borderWidth: 1, flexDirection: 'row', gap: 12, padding: 16 },
+  planCopy: { flex: 1, gap: 4 },
+  planTitle: { fontFamily: fonts.body, fontSize: 19, fontWeight: '900' },
+  planMeta: { fontFamily: fonts.body, fontSize: 13, fontWeight: '800' },
+  ratingPill: { borderRadius: 999, paddingHorizontal: 13, paddingVertical: 8 },
+  ratingText: { fontFamily: fonts.body, fontSize: 15, fontWeight: '900' },
+  badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  badgeCard: { borderRadius: 18, borderWidth: 1, gap: 5, padding: 12, width: '30.5%' },
+  badgeText: { fontFamily: fonts.body, fontSize: 13, fontWeight: '900' },
+  badgeMeta: { fontFamily: fonts.body, fontSize: 11, fontWeight: '800' },
+  giftGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  giftCard: { borderRadius: 18, borderWidth: 1, gap: 6, padding: 12, width: '47%' },
+  giftName: { fontFamily: fonts.body, fontSize: 14, fontWeight: '900' },
+  giftStock: { fontFamily: fonts.body, fontSize: 13, fontWeight: '900' },
 });

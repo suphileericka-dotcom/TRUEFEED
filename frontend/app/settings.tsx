@@ -6,12 +6,14 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ScreenShell, SeasonSwitcher, SectionLabel, TruefeedModal } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { useLanguage } from '@/hooks/use-language';
 import { useSession } from '@/hooks/use-session';
 
 type Dialog = 'logout' | 'delete' | null;
 
 export default function SettingsScreen() {
   const { selectedSeason, setSelectedSeason } = useGlobalSeason();
+  const { language, setLanguage } = useLanguage();
   const theme = seasonThemes[selectedSeason];
   const { isAuthenticated, hasKnownAccount, isAdmin, signOut, deleteAccount } = useSession();
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -72,6 +74,34 @@ export default function SettingsScreen() {
         <SeasonSwitcher selectedSeason={selectedSeason} onSelect={setSelectedSeason} />
       </View>
 
+      <View style={[styles.themeCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <Text style={[styles.themeTitle, { color: theme.text }]}>Langue</Text>
+        <View style={styles.languageRow}>
+          <Pressable
+            onPress={() => setLanguage('fr')}
+            style={[
+              styles.languageButton,
+              { backgroundColor: language === 'fr' ? theme.accentStrong : theme.surfaceAlt },
+            ]}
+          >
+            <Text style={[styles.languageText, { color: language === 'fr' ? '#FFFFFF' : theme.text }]}>
+              Francais
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setLanguage('en')}
+            style={[
+              styles.languageButton,
+              { backgroundColor: language === 'en' ? theme.accentStrong : theme.surfaceAlt },
+            ]}
+          >
+            <Text style={[styles.languageText, { color: language === 'en' ? '#FFFFFF' : theme.text }]}>
+              English
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
       {rows.map((row) => (
         <Pressable
           key={row.title}
@@ -110,6 +140,9 @@ const styles = StyleSheet.create({
   meta: { fontFamily: fonts.body, fontSize: 14, fontWeight: '800', lineHeight: 21, textAlign: 'center' },
   themeCard: { borderRadius: 24, borderWidth: 1, gap: 12, padding: 16 },
   themeTitle: { fontFamily: fonts.body, fontSize: 16, fontWeight: '900' },
+  languageRow: { flexDirection: 'row', gap: 10 },
+  languageButton: { alignItems: 'center', borderRadius: 16, flex: 1, paddingVertical: 13 },
+  languageText: { fontFamily: fonts.body, fontSize: 14, fontWeight: '900' },
   row: { alignItems: 'center', borderRadius: 20, borderWidth: 1, flexDirection: 'row', gap: 12, padding: 16 },
   rowText: { flex: 1, fontFamily: fonts.body, fontSize: 16, fontWeight: '800' },
 });

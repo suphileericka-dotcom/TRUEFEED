@@ -14,7 +14,6 @@ import {
   TruefeedModal,
 } from '@/components/truefeed/ui';
 import {
-  attachmentOptions,
   fonts,
   postFormats,
   publishMediaOptions,
@@ -23,6 +22,7 @@ import {
   visibilityOptions,
 } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { useSession } from '@/hooks/use-session';
 
 type FormatKey = 'photo' | 'vlog' | 'debate' | 'tip';
 type MediaKey = (typeof publishMediaOptions)[number]['key'];
@@ -30,6 +30,7 @@ type PublishState = 'idle' | 'draft' | 'published';
 
 export default function PublishScreen() {
   const { selectedSeason } = useGlobalSeason();
+  const { isAuthenticated } = useSession();
   const [format, setFormat] = useState<FormatKey>('vlog');
   const [mediaType, setMediaType] = useState<MediaKey>('video');
   const [visibility, setVisibility] = useState('Public');
@@ -39,7 +40,6 @@ export default function PublishScreen() {
     'Spot prefere du moment, lumiere parfaite et petite astuce budget a partager avec la commu.',
   );
   const [selectedTags, setSelectedTags] = useState<string[]>(['ville', 'food']);
-  const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [selectedMediaUri, setSelectedMediaUri] = useState<string | null>(null);
   const [publishState, setPublishState] = useState<PublishState>('idle');
   const [showPublishModal, setShowPublishModal] = useState(false);
@@ -52,12 +52,6 @@ export default function PublishScreen() {
   function toggleTag(tag: string) {
     setSelectedTags((current) =>
       current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag],
-    );
-  }
-
-  function toggleModule(label: string) {
-    setSelectedModules((current) =>
-      current.includes(label) ? current.filter((item) => item !== label) : [...current, label],
     );
   }
 
@@ -100,6 +94,12 @@ export default function PublishScreen() {
   }
 
   function publishPost() {
+    if (!isAuthenticated) {
+      setShowPublishModal(false);
+      router.push('/login');
+      return;
+    }
+
     setPublishState('published');
     setShowPublishModal(false);
 
@@ -235,31 +235,6 @@ export default function PublishScreen() {
               />
             );
           })}
-        </View>
-
-        <Text style={[styles.label, { color: theme.text }]}>Modules</Text>
-        <View style={styles.attachmentGrid}>
-          {attachmentOptions.map((item) => (
-            <Pressable
-              key={item.label}
-              onPress={() => toggleModule(item.label)}
-              style={[
-                styles.attachmentCard,
-                {
-                  backgroundColor: selectedModules.includes(item.label)
-                    ? theme.accentSoft
-                    : theme.surfaceAlt,
-                  borderColor: selectedModules.includes(item.label)
-                    ? theme.accentStrong
-                    : theme.border,
-                },
-              ]}
-            >
-              <Text style={styles.attachmentIcon}>{item.icon}</Text>
-              <Text style={[styles.attachmentTitle, { color: theme.text }]}>{item.label}</Text>
-              <Text style={[styles.attachmentDetail, { color: theme.muted }]}>{item.detail}</Text>
-            </Pressable>
-          ))}
         </View>
 
         <Text style={[styles.label, { color: theme.text }]}>Visibilite</Text>
@@ -449,35 +424,10 @@ const styles = StyleSheet.create({
     minHeight: 130,
     padding: 16,
   },
-  attachmentGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
   tagRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-  },
-  attachmentCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    gap: 8,
-    padding: 16,
-    width: '47%',
-  },
-  attachmentIcon: {
-    fontSize: 28,
-  },
-  attachmentTitle: {
-    fontFamily: fonts.body,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  attachmentDetail: {
-    fontFamily: fonts.body,
-    fontSize: 14,
   },
   visibilityRow: {
     flexDirection: 'row',
