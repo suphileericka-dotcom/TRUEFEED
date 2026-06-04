@@ -39,6 +39,8 @@ const storyProfiles = [
   { name: 'Alex', avatar: 'A', colors: ['#F9CE34', '#EE2A7B'] },
 ];
 
+const storyBackgrounds = ['#111827', '#EE2A7B', '#F97316', '#14B8A6', '#2563EB', '#7C3AED'];
+
 const feedPosts: FeedPost[] = [
   {
     id: 'kyoto-morning',
@@ -173,6 +175,7 @@ export default function HomeScreen() {
   const [showStoryComposer, setShowStoryComposer] = useState(false);
   const [storyText, setStoryText] = useState('');
   const [storyMediaType, setStoryMediaType] = useState<'image' | 'video' | null>(null);
+  const [storyBackground, setStoryBackground] = useState(storyBackgrounds[0]);
   const theme = seasonThemes[selectedSeason];
   const feed = feedBySeason[selectedSeason];
   const tagOptions = ['Tous', 'BonPlan', 'VlogFeed', 'TrueDebate'];
@@ -307,7 +310,7 @@ export default function HomeScreen() {
         onClose={() => setShowStoryComposer(false)}
         onPrimary={publishStory}
       >
-        <View style={[styles.storyComposerPreview, { backgroundColor: theme.accentStrong }]}>
+        <View style={[styles.storyComposerPreview, { backgroundColor: storyBackground }]}>
           <Text style={styles.storyComposerKicker}>
             {storyMediaType ? (storyMediaType === 'video' ? 'Video' : 'Photo') : 'Texte'}
           </Text>
@@ -326,6 +329,21 @@ export default function HomeScreen() {
             { backgroundColor: theme.surfaceAlt, color: theme.text, borderColor: theme.border },
           ]}
         />
+        <View style={styles.storyPalette}>
+          {storyBackgrounds.map((color) => (
+            <Pressable
+              key={color}
+              onPress={() => setStoryBackground(color)}
+              style={[
+                styles.storySwatch,
+                {
+                  backgroundColor: color,
+                  borderColor: storyBackground === color ? theme.text : 'transparent',
+                },
+              ]}
+            />
+          ))}
+        </View>
         <Pressable
           onPress={pickStoryMedia}
           style={[styles.storyMediaButton, { backgroundColor: theme.surfaceAlt }]}
@@ -415,6 +433,16 @@ const styles = StyleSheet.create({
     minHeight: 92,
     padding: 14,
     textAlignVertical: 'top',
+  },
+  storyPalette: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  storySwatch: {
+    borderRadius: 18,
+    borderWidth: 3,
+    height: 36,
+    width: 36,
   },
   storyMediaButton: {
     alignItems: 'center',
