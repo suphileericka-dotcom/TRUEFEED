@@ -20,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="messages" />
         <Stack.Screen name="notifications" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="admin" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>

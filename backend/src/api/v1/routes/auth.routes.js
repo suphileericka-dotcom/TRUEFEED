@@ -21,7 +21,6 @@ const registerSchema = {
   displayName: { type: 'string', required: true, minLength: 2, maxLength: 80 },
   avatarUrl: { type: 'string', url: true, maxLength: 500 },
   bio: { type: 'string', maxLength: 240 },
-  role: { type: 'string', enum: ['user', 'admin'] },
 };
 
 const loginSchema = {

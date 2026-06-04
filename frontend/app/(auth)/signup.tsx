@@ -6,13 +6,38 @@ import { BrandHeader, ScreenShell, SectionLabel } from '@/components/truefeed/ui
 import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 import { useSession } from '@/hooks/use-session';
+import { authApi } from '@/services/api/auth';
 
 export default function SignupScreen() {
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
   const { signIn } = useSession();
-  const [displayName, setDisplayName] = useState('Maya');
-  const [email, setEmail] = useState('maya@truefeed.test');
+  const [displayName, setDisplayName] = useState('Suphile NTSIMBA');
+  const [username, setUsername] = useState('suphile');
+  const [email, setEmail] = useState('nsuphile@gmail.com');
+  const [password, setPassword] = useState('');
+  const [status, setStatus] = useState('');
+
+  async function signup() {
+    if (password.length < 8) {
+      setStatus('Le mot de passe doit contenir au moins 8 caracteres.');
+      return;
+    }
+
+    try {
+      setStatus('Creation du compte...');
+      const result = await authApi.register({
+        username,
+        email,
+        password,
+        displayName,
+      });
+      signIn(result);
+      router.replace('/onboarding');
+    } catch {
+      setStatus('Impossible de creer le compte avec ces informations.');
+    }
+  }
 
   return (
     <ScreenShell theme={theme}>
@@ -34,6 +59,14 @@ export default function SignupScreen() {
         />
         <TextInput
           autoCapitalize="none"
+          onChangeText={setUsername}
+          placeholder="Nom utilisateur"
+          placeholderTextColor={theme.muted}
+          style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
+          value={username}
+        />
+        <TextInput
+          autoCapitalize="none"
           keyboardType="email-address"
           onChangeText={setEmail}
           placeholder="Email"
@@ -42,21 +75,21 @@ export default function SignupScreen() {
           value={email}
         />
         <TextInput
+          onChangeText={setPassword}
           placeholder="Mot de passe"
           placeholderTextColor={theme.muted}
           secureTextEntry
           style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
+          value={password}
         />
 
         <Pressable
-          onPress={() => {
-            signIn();
-            router.replace('/onboarding');
-          }}
+          onPress={signup}
           style={[styles.primary, { backgroundColor: theme.accentStrong }]}
         >
           <Text style={styles.primaryText}>Creer le compte</Text>
         </Pressable>
+        {status ? <Text style={[styles.status, { color: theme.muted }]}>{status}</Text> : null}
         <Link href="/login">
           <Text style={[styles.linkText, { color: theme.accentStrong }]}>Compte deja cree</Text>
         </Link>
@@ -81,4 +114,5 @@ const styles = StyleSheet.create({
   primary: { alignItems: 'center', borderRadius: 18, paddingVertical: 16 },
   primaryText: { color: '#FFFFFF', fontFamily: fonts.body, fontSize: 15, fontWeight: '800' },
   linkText: { fontFamily: fonts.body, fontSize: 14, fontWeight: '800', textAlign: 'center' },
+  status: { fontFamily: fonts.body, fontSize: 14, fontWeight: '800', textAlign: 'center' },
 });

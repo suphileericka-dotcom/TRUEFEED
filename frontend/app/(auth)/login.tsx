@@ -6,13 +6,26 @@ import { BrandHeader, ScreenShell, SectionLabel } from '@/components/truefeed/ui
 import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 import { useSession } from '@/hooks/use-session';
+import { authApi } from '@/services/api/auth';
 
 export default function LoginScreen() {
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
   const { signIn } = useSession();
-  const [email, setEmail] = useState('maya@truefeed.test');
-  const [password, setPassword] = useState('StrongPass123');
+  const [email, setEmail] = useState('nsuphile@gmail.com');
+  const [password, setPassword] = useState('');
+  const [status, setStatus] = useState('');
+
+  async function login() {
+    try {
+      setStatus('Connexion...');
+      const result = await authApi.login({ email, password });
+      signIn(result);
+      router.replace('/(tabs)');
+    } catch {
+      setStatus('Email ou mot de passe incorrect.');
+    }
+  }
 
   return (
     <ScreenShell theme={theme}>
@@ -44,14 +57,13 @@ export default function LoginScreen() {
         />
 
         <Pressable
-          onPress={() => {
-            signIn();
-            router.replace('/(tabs)');
-          }}
+          onPress={login}
           style={[styles.primary, { backgroundColor: theme.accentStrong }]}
         >
           <Text style={styles.primaryText}>Se connecter</Text>
         </Pressable>
+
+        {status ? <Text style={[styles.status, { color: theme.muted }]}>{status}</Text> : null}
 
         <View style={styles.links}>
           <Link href="/forgot">
@@ -77,4 +89,5 @@ const styles = StyleSheet.create({
   primaryText: { color: '#FFFFFF', fontFamily: fonts.body, fontSize: 15, fontWeight: '800' },
   links: { flexDirection: 'row', justifyContent: 'space-between' },
   linkText: { fontFamily: fonts.body, fontSize: 14, fontWeight: '800' },
+  status: { fontFamily: fonts.body, fontSize: 14, fontWeight: '800', textAlign: 'center' },
 });

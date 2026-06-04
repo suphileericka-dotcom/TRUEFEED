@@ -13,11 +13,14 @@ type Dialog = 'logout' | 'delete' | null;
 export default function SettingsScreen() {
   const { selectedSeason, setSelectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
-  const { isAuthenticated, hasKnownAccount, signOut, deleteAccount } = useSession();
+  const { isAuthenticated, hasKnownAccount, isAdmin, signOut, deleteAccount } = useSession();
   const [dialog, setDialog] = useState<Dialog>(null);
 
   const rows = isAuthenticated
     ? [
+        ...(isAdmin
+          ? [{ icon: 'shield-checkmark-outline' as const, title: 'Admin', onPress: () => router.push('/admin') }]
+          : []),
         { icon: 'log-out-outline' as const, title: 'Se deconnecter', onPress: () => setDialog('logout') },
         { icon: 'trash-outline' as const, title: 'Supprimer le compte', onPress: () => setDialog('delete') },
       ]

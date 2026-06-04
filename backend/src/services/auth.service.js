@@ -105,6 +105,17 @@ function toPublicUser(row) {
   };
 }
 
+function getAdminEmails() {
+  return (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function getRoleForEmail(email) {
+  return getAdminEmails().includes(email.toLowerCase()) ? 'admin' : 'user';
+}
+
 async function createSession(user) {
   const refreshToken = createRefreshToken();
   const accessToken = signJwt(
@@ -170,7 +181,7 @@ async function register(payload) {
       payload.avatarUrl || null,
       payload.bio || null,
       hashPassword(payload.password),
-      payload.role === 'admin' ? 'admin' : 'user',
+      getRoleForEmail(payload.email),
     ],
   );
   const user = toPublicUser(result.rows[0]);
@@ -199,7 +210,21 @@ async function login({ email, password }) {
     throw createHttpError(403, 'user_inactive', 'Ce compte ne peut pas se connecter.');
   }
 
-  const user = toPublicUser(row);
+  let userRow = row;
+  const expectedRole = getRoleForEmail(row.email);
+
+  if (expectedRole !== row.role) {
+    const promoted = await query(
+      `UPDATE users
+       SET role = $2, updated_at = now()
+       WHERE id = $1
+       RETURNING *`,
+      [row.id, expectedRole],
+    );
+    userRow = promoted.rows[0];
+  }
+
+  const user = toPublicUser(userRow);
 
   return {
     user,
