@@ -5,6 +5,7 @@ import { memo, useState } from 'react';
 import {
   FlatList,
   Pressable,
+  ScrollView,
   Share,
   StyleSheet,
   Text,
@@ -251,7 +252,11 @@ export default function HomeScreen() {
                 />
               ))}
             </View>
-            <View style={styles.storyRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.storyRow}
+            >
               <Pressable onPress={() => setShowStoryComposer(true)} style={styles.storyItem}>
                 <View
                   style={[
@@ -282,7 +287,7 @@ export default function HomeScreen() {
                   <Text style={[styles.storyName, { color: theme.muted }]}>{name}</Text>
                 </View>
               ))}
-            </View>
+            </ScrollView>
           </View>
         }
         renderItem={({ item }) => <FeedCard post={item} theme={theme} />}
@@ -339,8 +344,8 @@ const styles = StyleSheet.create({
   skeletonRow: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   skeletonBlock: { borderRadius: 18, height: 42, width: 42 },
   skeletonLine: { borderRadius: 999, flex: 1, height: 14 },
-  storyRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  storyItem: { alignItems: 'center', gap: 8 },
+  storyRow: { gap: 18, paddingRight: 20 },
+  storyItem: { alignItems: 'center', gap: 8, width: 78 },
   storyCircle: { borderRadius: 40, borderWidth: 3, height: 68, width: 68 },
   storyPlus: {
     alignItems: 'center',
