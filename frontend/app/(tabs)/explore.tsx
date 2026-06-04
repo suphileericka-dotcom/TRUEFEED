@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { BrandHeader, Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { MapExplorer } from '@/components/truefeed/map-explorer';
+import { BrandHeader, Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 import { mapApi, type MapPlace } from '@/services/api/map';
@@ -13,6 +13,14 @@ type LocationState = {
   lat: number;
   lng: number;
 } | null;
+
+function matchesPlace(place: MapPlace, query: string) {
+  return [place.name, place.city, place.category, place.address, ...place.tags]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+    .includes(query);
+}
 
 export default function ExploreScreen() {
   const { selectedSeason } = useGlobalSeason();
@@ -24,6 +32,8 @@ export default function ExploreScreen() {
   const [location, setLocation] = useState<LocationState>(null);
   const [locationLabel, setLocationLabel] = useState('Activer GPS');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState<MapPlace[]>([]);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   const visibleCategories = useMemo(
     () => (categories.length > 0 ? categories : ['Monument', 'Musee', 'Food']),
@@ -36,13 +46,21 @@ export default function ExploreScreen() {
       return places;
     }
 
-    return places.filter((place) =>
-      [place.name, place.city, place.category, ...place.tags]
-        .join(' ')
-        .toLowerCase()
-        .includes(query),
-    );
+    return places.filter((place) => matchesPlace(place, query));
   }, [places, searchQuery]);
+  const suggestions = useMemo(() => {
+    const merged = [...visiblePlaces, ...searchSuggestions];
+    const seen = new Set<string>();
+
+    return merged.filter((place) => {
+      if (seen.has(place.id)) {
+        return false;
+      }
+
+      seen.add(place.id);
+      return true;
+    });
+  }, [searchSuggestions, visiblePlaces]);
 
   useEffect(() => {
     let isMounted = true;
@@ -101,6 +119,40 @@ export default function ExploreScreen() {
     );
   }, [visiblePlaces]);
 
+  useEffect(() => {
+    const query = searchQuery.trim();
+
+    if (query.length < 2) {
+      setSearchSuggestions([]);
+      return;
+    }
+
+    let isMounted = true;
+    const timeout = setTimeout(() => {
+      mapApi
+        .searchPlaces({
+          q: query,
+          lat: location?.lat,
+          lng: location?.lng,
+        })
+        .then((result) => {
+          if (isMounted) {
+            setSearchSuggestions(result.items);
+          }
+        })
+        .catch(() => {
+          if (isMounted) {
+            setSearchSuggestions([]);
+          }
+        });
+    }, 300);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeout);
+    };
+  }, [location?.lat, location?.lng, searchQuery]);
+
   async function enableLocation() {
     try {
       setLocationLabel('GPS...');
@@ -110,6 +162,34 @@ export default function ExploreScreen() {
       setLocationLabel('GPS indispo');
     }
   }
+
+  function selectPlace(place: MapPlace) {
+    setPlaces((current) => {
+      if (current.some((item) => item.id === place.id)) {
+        return current;
+      }
+
+      return [place, ...current];
+    });
+    setSelectedPlace(place);
+    setSearchQuery(place.name);
+    setIsSearchFocused(false);
+  }
+
+  function submitSearch() {
+    if (suggestions[0]) {
+      selectPlace(suggestions[0]);
+    }
+  }
+
+  const selectedPlaceMeta = selectedPlace
+    ? `${selectedPlace.category} - ${selectedPlace.city}${
+        selectedPlace.distanceKm !== undefined ? ` - ${selectedPlace.distanceKm} km` : ''
+      }`
+    : 'Active le GPS ou change de categorie';
+  const selectedPlaceCopy = selectedPlace
+    ? selectedPlace.address || `Tags: ${selectedPlace.tags.join(', ') || 'aucun tag'}`
+    : 'Active le GPS pour voir les lieux proches classes par distance.';
 
   return (
     <ScreenShell theme={theme}>
@@ -129,11 +209,53 @@ export default function ExploreScreen() {
         <TextInput
           value={searchQuery}
           onChangeText={setSearchQuery}
+          onFocus={() => setIsSearchFocused(true)}
+          onSubmitEditing={submitSearch}
           placeholder="Rechercher lieu, categorie, tag..."
           placeholderTextColor={theme.muted}
+          returnKeyType="search"
           style={[styles.searchInput, { color: theme.text }]}
         />
+        {searchQuery.length > 0 ? (
+          <Pressable onPress={() => setSearchQuery('')} style={styles.clearButton}>
+            <Ionicons name="close-circle" size={22} color={theme.muted} />
+          </Pressable>
+        ) : null}
       </View>
+
+      {isSearchFocused && searchQuery.trim().length > 0 ? (
+        <View
+          style={[
+            styles.suggestionPanel,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+          ]}
+        >
+          {suggestions.length > 0 ? (
+            suggestions.slice(0, 6).map((place) => (
+              <Pressable
+                key={place.id}
+                onPress={() => selectPlace(place)}
+                style={[styles.suggestionRow, { borderBottomColor: theme.border }]}
+              >
+                <View style={[styles.suggestionIcon, { backgroundColor: theme.surfaceAlt }]}>
+                  <Ionicons name="location-outline" size={20} color={theme.accentStrong} />
+                </View>
+                <View style={styles.suggestionTextGroup}>
+                  <Text numberOfLines={1} style={[styles.suggestionName, { color: theme.text }]}>
+                    {place.name}
+                  </Text>
+                  <Text numberOfLines={1} style={[styles.suggestionMeta, { color: theme.muted }]}>
+                    {place.address || `${place.category} - ${place.city}`}
+                  </Text>
+                </View>
+                <Ionicons name="return-down-back" size={18} color={theme.muted} />
+              </Pressable>
+            ))
+          ) : (
+            <Text style={[styles.emptySuggestion, { color: theme.muted }]}>Aucun resultat</Text>
+          )}
+        </View>
+      ) : null}
 
       <View style={styles.categoryRow}>
         <Chip
@@ -161,6 +283,8 @@ export default function ExploreScreen() {
         theme={theme}
         onSelectPlace={setSelectedPlace}
         userLocation={location ?? undefined}
+        onLocate={enableLocation}
+        hasUserLocation={Boolean(location)}
       />
 
       <View
@@ -170,24 +294,14 @@ export default function ExploreScreen() {
           <Text style={[styles.placeName, { color: theme.text }]}>
             {selectedPlace?.name || 'Aucun lieu'}
           </Text>
-          <Text style={[styles.placeMeta, { color: theme.muted }]}>
-            {selectedPlace
-              ? `${selectedPlace.category} · ${selectedPlace.city}${
-                  selectedPlace.distanceKm !== undefined ? ` · ${selectedPlace.distanceKm} km` : ''
-                }`
-              : 'Active le GPS ou change de categorie'}
-          </Text>
+          <Text style={[styles.placeMeta, { color: theme.muted }]}>{selectedPlaceMeta}</Text>
         </View>
         <View style={[styles.score, { backgroundColor: theme.accentSoft }]}>
           <Text style={[styles.scoreText, { color: theme.accentStrong }]}>
             {selectedPlace?.score?.toFixed(1) || '--'}
           </Text>
         </View>
-        <Text style={[styles.placeCopy, { color: theme.muted }]}>
-          {selectedPlace
-            ? `Tags: ${selectedPlace.tags.join(', ') || 'aucun tag'}`
-            : 'Active le GPS pour voir les lieux proches classes par distance.'}
-        </Text>
+        <Text style={[styles.placeCopy, { color: theme.muted }]}>{selectedPlaceCopy}</Text>
       </View>
     </ScreenShell>
   );
@@ -202,7 +316,33 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 16,
   },
+  clearButton: { padding: 2 },
   searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 16 },
+  suggestionPanel: {
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  suggestionRow: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    minHeight: 72,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  suggestionIcon: {
+    alignItems: 'center',
+    borderRadius: 24,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  suggestionTextGroup: { flex: 1 },
+  suggestionName: { fontFamily: fonts.body, fontSize: 17, fontWeight: '800' },
+  suggestionMeta: { fontFamily: fonts.body, fontSize: 13, fontWeight: '700', marginTop: 3 },
+  emptySuggestion: { fontFamily: fonts.body, fontSize: 14, fontWeight: '700', padding: 16 },
   categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   placeCard: { borderRadius: 26, borderWidth: 1, gap: 12, padding: 18 },
   placeName: { fontFamily: fonts.title, fontSize: 30, fontWeight: '700' },

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -13,6 +14,8 @@ type MapExplorerProps = {
     lat: number;
     lng: number;
   };
+  onLocate?: () => void;
+  hasUserLocation?: boolean;
 };
 
 const defaultCenter = { lat: 48.8584, lng: 2.2945 };
@@ -56,6 +59,8 @@ export function MapExplorer({
   theme,
   onSelectPlace,
   userLocation,
+  onLocate,
+  hasUserLocation,
 }: MapExplorerProps) {
   const [isClient, setIsClient] = useState(false);
   const center = useMemo(
@@ -76,6 +81,29 @@ export function MapExplorer({
           style={iframeStyle}
           title={selectedPlace ? `Carte ${selectedPlace.name}` : 'Carte MapExplorer'}
         />
+      ) : null}
+
+      {selectedPlace ? (
+        <View style={[styles.selectedPanel, { backgroundColor: theme.surface }]}>
+          <Text numberOfLines={1} style={[styles.selectedName, { color: theme.text }]}>
+            {selectedPlace.name}
+          </Text>
+          <Text numberOfLines={1} style={[styles.selectedMeta, { color: theme.muted }]}>
+            {selectedPlace.address || `${selectedPlace.category} - ${selectedPlace.city}`}
+          </Text>
+        </View>
+      ) : null}
+
+      {onLocate ? (
+        <Pressable
+          onPress={onLocate}
+          style={[
+            styles.locateButton,
+            { backgroundColor: hasUserLocation ? theme.accentStrong : theme.surface },
+          ]}
+        >
+          <Ionicons name="navigate" size={20} color={hasUserLocation ? '#FFFFFF' : theme.accentStrong} />
+        </Pressable>
       ) : null}
 
       <View style={styles.placeRail}>
@@ -111,6 +139,36 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 390,
     overflow: 'hidden',
+  },
+  locateButton: {
+    alignItems: 'center',
+    borderRadius: 24,
+    height: 46,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    width: 46,
+  },
+  selectedPanel: {
+    borderRadius: 16,
+    left: 12,
+    maxWidth: '72%',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    position: 'absolute',
+    top: 12,
+  },
+  selectedName: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  selectedMeta: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 3,
   },
   placeRail: {
     bottom: 12,
