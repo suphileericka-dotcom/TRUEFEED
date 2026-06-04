@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { memo, useState } from 'react';
 import { FlatList, Pressable, Share, StyleSheet, Text, View } from 'react-native';
@@ -151,12 +152,31 @@ export default function HomeScreen() {
   const { selectedSeason } = useGlobalSeason();
   const [sort, setSort] = useState<'recent' | 'popular'>('recent');
   const [activeTag, setActiveTag] = useState('Tous');
+  const [hasOwnStory, setHasOwnStory] = useState(false);
   const theme = seasonThemes[selectedSeason];
   const feed = feedBySeason[selectedSeason];
   const tagOptions = ['Tous', 'BonPlan', 'VlogFeed', 'TrueDebate'];
   const filteredPosts = feedPosts
     .filter((post) => activeTag === 'Tous' || post.tag === activeTag)
     .sort((a, b) => (sort === 'popular' ? b.likes - a.likes : 0));
+
+  async function createStory() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      quality: 0.85,
+      videoMaxDuration: 30,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setHasOwnStory(true);
+    }
+  }
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -212,6 +232,22 @@ export default function HomeScreen() {
               ))}
             </View>
             <View style={styles.storyRow}>
+              <Pressable onPress={createStory} style={styles.storyItem}>
+                <View
+                  style={[
+                    styles.storyCircle,
+                    {
+                      borderColor: hasOwnStory ? theme.accentStrong : theme.border,
+                      backgroundColor: theme.surface,
+                    },
+                  ]}
+                >
+                  <View style={[styles.storyPlus, { backgroundColor: theme.accentStrong }]}>
+                    <Ionicons name="add" size={17} color="#FFFFFF" />
+                  </View>
+                </View>
+                <Text style={[styles.storyName, { color: theme.muted }]}>Ta story</Text>
+              </Pressable>
               {storyUsers.map((name, index) => (
                 <View key={name} style={styles.storyItem}>
                   <View
@@ -246,6 +282,16 @@ const styles = StyleSheet.create({
   storyRow: { flexDirection: 'row', justifyContent: 'space-between' },
   storyItem: { alignItems: 'center', gap: 8 },
   storyCircle: { borderRadius: 40, borderWidth: 3, height: 68, width: 68 },
+  storyPlus: {
+    alignItems: 'center',
+    borderRadius: 13,
+    bottom: -2,
+    height: 26,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: -2,
+    width: 26,
+  },
   storyName: { fontFamily: fonts.body, fontSize: 13, fontWeight: '700' },
   postCard: { borderRadius: 28, borderWidth: 1, overflow: 'hidden' },
   postHeader: {
