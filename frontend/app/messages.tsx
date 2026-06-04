@@ -58,15 +58,15 @@ const gifts = [
 ];
 
 const starterMessages: ChatMessage[] = [
-  { id: '1', mine: false, text: 'Oui j attends que mon pote se reveille' },
-  { id: '2', mine: true, text: 'Et toi t as assez dormi ?' },
-  { id: '3', mine: false, text: 'Oui ca va' },
+  { id: '1', mine: false, text: 'Jai un super bon plan de lieux à visitier que j ai décourvet' },
+  { id: '2', mine: true, text: 'AH oui?' },
+  { id: '3', mine: false, text: 'Oui ' },
   { id: '4', mine: false, text: 'Faut attaquer la journee maintenant' },
-  { id: '5', mine: true, text: 'Et moi la soiree 😉' },
-  { id: '6', mine: false, text: 'Bonne soiree alors 😊' },
-  { id: '7', mine: true, text: 'Je ne sors pas je la passe chez moi 😉 je ne sors que quand ma pote est dispo' },
+  { id: '5', mine: true, text: 'ahahah' },
+  { id: '6', mine: false, text: '......' },
+  { id: '7', mine: true, text: '........' },
   { id: '8', mine: false, text: 'Ah oui d accord repose toi bien alors' },
-  { id: '9', mine: true, text: 'Oui cheri 🙂' },
+  { id: '9', mine: true, text: 'Oui ' },
 ];
 
 export default function MessagesScreen() {
