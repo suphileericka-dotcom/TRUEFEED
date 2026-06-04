@@ -9,23 +9,25 @@ import { useGlobalSeason } from '@/hooks/use-global-season';
 import { useSession } from '@/hooks/use-session';
 
 const badgeMilestones = [5, 10, 15, 20, 25, 30, 33, 35, 50, 75];
+const badgeColors = ['#F59E0B', '#06B6D4', '#8B5CF6', '#EF4444', '#10B981', '#F97316', '#3B82F6', '#EC4899', '#14B8A6', '#111827'];
+const badgeIcons = ['ribbon', 'star', 'trophy', 'sparkles', 'shield-checkmark', 'heart', 'flame', 'rocket', 'planet', 'diamond'] as const;
 
 const gifts = [
-  { unlockAt: 2, name: 'Confettis', stock: 3, detail: "Confettis sur l'ecran d'une personne." },
-  { unlockAt: 4, name: 'Emoji Geant', stock: 5, detail: "Emoji plein ecran chez le destinataire." },
-  { unlockAt: 6, name: 'Applaudissements', stock: 3, detail: "Animation d'applaudissements sur un post." },
-  { unlockAt: 8, name: 'Meteo Mood', stock: 2, detail: 'Meteo animee selon ton humeur.' },
-  { unlockAt: 11, name: 'Surnom Secret', stock: 2, detail: 'Surnom visible entre deux personnes.' },
-  { unlockAt: 13, name: 'Fausse Alerte', stock: 1, detail: 'Notification rigolote a un ami.' },
-  { unlockAt: 16, name: 'Relance Fantome', stock: 2, detail: "Renvoie un message discretement." },
-  { unlockAt: 18, name: 'Grimace Party', stock: 1, detail: 'Emoji souriant pendant 3 secondes.' },
-  { unlockAt: 22, name: 'Boost Visibilite', stock: 2, detail: 'Post en tete du feed pendant 24h.' },
-  { unlockAt: 24, name: 'Archiviste', stock: 3, detail: 'Sauvegarde un post dans ta collection.' },
-  { unlockAt: 25, name: 'Mystique Charme', stock: 2, detail: "Message a quelqu'un qui ne te suit pas." },
-  { unlockAt: 27, name: 'Time Capsule', stock: 1, detail: 'Message programme dans 7 jours.' },
-  { unlockAt: 29, name: 'Mode Fantome', stock: 1, detail: 'Invisible dans vu recemment pendant 1h.' },
-  { unlockAt: 31, name: 'Traducteur Universel', stock: 1, detail: 'Traduit une conversation en 1 clic.' },
-  { unlockAt: 34, name: 'Recap Magique', stock: 1, detail: 'Resume rigolo de ton activite.' },
+  { unlockAt: 2, name: 'Confettis', stock: 3, icon: 'sparkles' as const, color: '#F59E0B', detail: "Confettis sur l'ecran d'une personne." },
+  { unlockAt: 4, name: 'Emoji Geant', stock: 5, icon: 'happy-outline' as const, color: '#8B5CF6', detail: "Emoji plein ecran chez le destinataire." },
+  { unlockAt: 6, name: 'Applaudissements', stock: 3, icon: 'heart-outline' as const, color: '#EF4444', detail: "Animation d'applaudissements sur un post." },
+  { unlockAt: 8, name: 'Meteo Mood', stock: 2, icon: 'cloud-outline' as const, color: '#0EA5E9', detail: 'Meteo animee selon ton humeur.' },
+  { unlockAt: 11, name: 'Surnom Secret', stock: 2, icon: 'pricetag-outline' as const, color: '#EC4899', detail: 'Surnom visible entre deux personnes.' },
+  { unlockAt: 13, name: 'Fausse Alerte', stock: 1, icon: 'notifications-outline' as const, color: '#F97316', detail: 'Notification rigolote a un ami.' },
+  { unlockAt: 16, name: 'Relance Fantome', stock: 2, icon: 'chatbubble-ellipses-outline' as const, color: '#6366F1', detail: "Renvoie un message discretement." },
+  { unlockAt: 18, name: 'Grimace Party', stock: 1, icon: 'people-outline' as const, color: '#84CC16', detail: 'Emoji souriant pendant 3 secondes.' },
+  { unlockAt: 22, name: 'Boost Visibilite', stock: 2, icon: 'trending-up-outline' as const, color: '#22C55E', detail: 'Post en tete du feed pendant 24h.' },
+  { unlockAt: 24, name: 'Archiviste', stock: 3, icon: 'bookmark-outline' as const, color: '#64748B', detail: 'Sauvegarde un post dans ta collection.' },
+  { unlockAt: 25, name: 'Mystique Charme', stock: 2, icon: 'mail-outline' as const, color: '#D946EF', detail: "Message a quelqu'un qui ne te suit pas." },
+  { unlockAt: 27, name: 'Time Capsule', stock: 1, icon: 'time-outline' as const, color: '#06B6D4', detail: 'Message programme dans 7 jours.' },
+  { unlockAt: 29, name: 'Mode Fantome', stock: 1, icon: 'eye-off-outline' as const, color: '#111827', detail: 'Invisible dans vu recemment pendant 1h.' },
+  { unlockAt: 31, name: 'Traducteur Universel', stock: 1, icon: 'language-outline' as const, color: '#14B8A6', detail: 'Traduit une conversation en 1 clic.' },
+  { unlockAt: 34, name: 'Recap Magique', stock: 1, icon: 'reader-outline' as const, color: '#A855F7', detail: 'Resume rigolo de ton activite.' },
 ];
 
 const initialPlans = [
@@ -131,19 +133,25 @@ export default function BonPlanScreen() {
       <View style={styles.badgeGrid}>
         {badgeMilestones.map((milestone, index) => {
           const unlocked = sharedCount >= milestone;
+          const badgeColor = badgeColors[index];
           return (
             <View
               key={milestone}
               style={[
                 styles.badgeCard,
-                { backgroundColor: unlocked ? theme.accentSoft : theme.surfaceAlt, borderColor: theme.border },
+                {
+                  backgroundColor: unlocked ? badgeColor : theme.surfaceAlt,
+                  borderColor: unlocked ? badgeColor : theme.border,
+                },
               ]}
             >
-              <Ionicons name="ribbon" size={20} color={unlocked ? theme.accentStrong : theme.muted} />
-              <Text style={[styles.badgeText, { color: unlocked ? theme.accentStrong : theme.muted }]}>
+              <View style={[styles.badgeIcon, { backgroundColor: unlocked ? 'rgba(255,255,255,0.22)' : theme.border }]}>
+                <Ionicons name={badgeIcons[index]} size={20} color={unlocked ? '#FFFFFF' : theme.muted} />
+              </View>
+              <Text style={[styles.badgeText, { color: unlocked ? '#FFFFFF' : theme.muted }]}>
                 Badge {index + 1}
               </Text>
-              <Text style={[styles.badgeMeta, { color: theme.muted }]}>{milestone} plans</Text>
+              <Text style={[styles.badgeMeta, { color: unlocked ? '#FFFFFF' : theme.muted }]}>{milestone} plans</Text>
             </View>
           );
         })}
@@ -166,6 +174,14 @@ export default function BonPlanScreen() {
                 },
               ]}
             >
+              <View
+                style={[
+                  styles.giftIcon,
+                  { backgroundColor: unlocked ? gift.color : theme.border },
+                ]}
+              >
+                <Ionicons name={gift.icon} size={21} color={unlocked ? '#FFFFFF' : theme.muted} />
+              </View>
               <Text style={[styles.giftName, { color: unlocked ? theme.text : theme.muted }]}>{gift.name}</Text>
               <Text style={[styles.giftStock, { color: theme.accentStrong }]}>
                 {unlocked ? `${gift.stock}x` : `${gift.unlockAt} plans`}
@@ -218,11 +234,13 @@ const styles = StyleSheet.create({
   ratingPill: { borderRadius: 999, paddingHorizontal: 13, paddingVertical: 8 },
   ratingText: { fontFamily: fonts.body, fontSize: 15, fontWeight: '900' },
   badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  badgeCard: { borderRadius: 18, borderWidth: 1, gap: 5, padding: 12, width: '30.5%' },
+  badgeCard: { borderRadius: 18, borderWidth: 1, gap: 6, padding: 12, width: '30.5%' },
+  badgeIcon: { alignItems: 'center', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
   badgeText: { fontFamily: fonts.body, fontSize: 13, fontWeight: '900' },
   badgeMeta: { fontFamily: fonts.body, fontSize: 11, fontWeight: '800' },
   giftGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   giftCard: { borderRadius: 18, borderWidth: 1, gap: 6, padding: 12, width: '47%' },
+  giftIcon: { alignItems: 'center', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
   giftName: { fontFamily: fonts.body, fontSize: 14, fontWeight: '900' },
   giftStock: { fontFamily: fonts.body, fontSize: 13, fontWeight: '900' },
 });

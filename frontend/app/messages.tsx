@@ -17,6 +17,13 @@ type Conversation = {
   verified?: boolean;
 };
 
+type ChatMessage = {
+  id: string;
+  mine: boolean;
+  text: string;
+  voice?: boolean;
+};
+
 const conversations: Conversation[] = [
   { id: 'nicolas', name: 'Nicolas Drossaert', username: 'nicolas.d', status: 'Envoye il y a 2 h', avatar: 'N' },
   { id: 'orlann', name: 'Orlann', username: 'orlann', status: 'Envoye il y a 3 h', avatar: 'O' },
@@ -41,15 +48,15 @@ const requests: Conversation[] = [
 ];
 
 const gifts = [
-  { name: 'Confettis', stock: 3, unlocked: true },
-  { name: 'Emoji Geant', stock: 5, unlocked: true },
-  { name: 'Applaudissements', stock: 0, unlocked: false },
-  { name: 'Meteo Mood', stock: 0, unlocked: false },
-  { name: 'Mystique Charme', stock: 0, unlocked: false },
-  { name: 'Recap Magique', stock: 0, unlocked: false },
+  { name: 'Confettis', stock: 3, unlocked: true, icon: 'sparkles' as const, color: '#F59E0B' },
+  { name: 'Emoji Geant', stock: 5, unlocked: true, icon: 'happy-outline' as const, color: '#8B5CF6' },
+  { name: 'Applaudissements', stock: 0, unlocked: false, icon: 'heart-outline' as const, color: '#EF4444' },
+  { name: 'Meteo Mood', stock: 0, unlocked: false, icon: 'cloud-outline' as const, color: '#0EA5E9' },
+  { name: 'Mystique Charme', stock: 0, unlocked: false, icon: 'mail-outline' as const, color: '#EC4899' },
+  { name: 'Recap Magique', stock: 0, unlocked: false, icon: 'reader-outline' as const, color: '#10B981' },
 ];
 
-const starterMessages = [
+const starterMessages: ChatMessage[] = [
   { id: '1', mine: false, text: 'Oui j attends que mon pote se reveille' },
   { id: '2', mine: true, text: 'Et toi t as assez dormi ?' },
   { id: '3', mine: false, text: 'Oui ca va' },
@@ -65,11 +72,15 @@ export default function MessagesScreen() {
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
   const [tab, setTab] = useState<MessageTab>('messages');
+  const [conversationList, setConversationList] = useState(conversations);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messageText, setMessageText] = useState('');
-  const [messages, setMessages] = useState(starterMessages);
+  const [messages, setMessages] = useState<ChatMessage[]>(starterMessages);
   const [showGifts, setShowGifts] = useState(false);
-  const visibleConversations = tab === 'messages' ? conversations : requests;
+  const [hoveredConversationId, setHoveredConversationId] = useState<string | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<Conversation | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const visibleConversations = tab === 'messages' ? conversationList : requests;
 
   function sendMessage() {
     const cleanMessage = messageText.trim();
@@ -83,6 +94,29 @@ export default function MessagesScreen() {
       { id: String(Date.now()), mine: true, text: cleanMessage },
     ]);
     setMessageText('');
+  }
+
+  function toggleRecording() {
+    if (isRecording) {
+      setMessages((current) => [
+        ...current,
+        { id: String(Date.now()), mine: true, text: 'Message vocal', voice: true },
+      ]);
+      setIsRecording(false);
+      return;
+    }
+
+    setMessageText('');
+    setIsRecording(true);
+  }
+
+  function deleteConversation() {
+    if (!deleteCandidate) {
+      return;
+    }
+
+    setConversationList((current) => current.filter((conversation) => conversation.id !== deleteCandidate.id));
+    setDeleteCandidate(null);
   }
 
   if (selectedConversation) {
@@ -99,8 +133,6 @@ export default function MessagesScreen() {
             <Text style={[styles.chatName, { color: theme.text }]}>{selectedConversation.name}</Text>
             <Text style={[styles.chatUsername, { color: theme.muted }]}>{selectedConversation.username}</Text>
           </View>
-          <Ionicons name="call-outline" size={28} color={theme.text} />
-          <Ionicons name="videocam-outline" size={30} color={theme.text} />
         </View>
 
         <View style={styles.messageStack}>
@@ -133,7 +165,7 @@ export default function MessagesScreen() {
                 ]}
               >
                 <Text style={[styles.bubbleText, { color: message.mine ? '#FFFFFF' : '#111827' }]}>
-                  {message.text}
+                  {message.voice ? 'Micro 0:03 - Message vocal' : message.text}
                 </Text>
               </Pressable>
             </View>
@@ -142,18 +174,20 @@ export default function MessagesScreen() {
         </View>
 
         <View style={[styles.chatComposer, { backgroundColor: theme.surfaceAlt }]}>
-          <View style={styles.cameraButton}>
-            <Ionicons name="camera" size={24} color="#FFFFFF" />
-          </View>
           <TextInput
-            value={messageText}
+            value={isRecording ? 'Enregistrement...' : messageText}
             onChangeText={setMessageText}
+            editable={!isRecording}
             placeholder="Votre message..."
             placeholderTextColor={theme.muted}
             style={[styles.chatInput, { color: theme.text }]}
           />
-          <Ionicons name="mic-outline" size={28} color={theme.text} />
-          <Ionicons name="image-outline" size={28} color={theme.text} />
+          <Pressable
+            onPress={toggleRecording}
+            style={[styles.audioButton, { backgroundColor: isRecording ? '#EF4444' : 'transparent' }]}
+          >
+            <Ionicons name={isRecording ? 'stop' : 'mic-outline'} size={26} color={isRecording ? '#FFFFFF' : theme.text} />
+          </Pressable>
           <Ionicons name="happy-outline" size={28} color={theme.text} />
           <Pressable onPress={messageText.trim() ? sendMessage : () => setShowGifts(true)}>
             <Ionicons name={messageText.trim() ? 'send' : 'add-circle-outline'} size={30} color={theme.text} />
@@ -208,6 +242,9 @@ export default function MessagesScreen() {
         <Pressable
           key={conversation.id}
           onPress={() => setSelectedConversation(conversation)}
+          onLongPress={() => tab === 'messages' && setDeleteCandidate(conversation)}
+          onHoverIn={() => tab === 'messages' && setHoveredConversationId(conversation.id)}
+          onHoverOut={() => setHoveredConversationId(null)}
           style={styles.conversationRow}
         >
           <View style={[styles.avatar, { backgroundColor: theme.accentSoft }]}>
@@ -220,8 +257,14 @@ export default function MessagesScreen() {
             </View>
             <Text style={[styles.status, { color: theme.muted }]}>{conversation.status}</Text>
           </View>
-          {tab === 'messages' ? (
-            <Pressable>
+          {tab === 'messages' && hoveredConversationId === conversation.id ? (
+            <Pressable
+              onPress={(event) => {
+                event.stopPropagation();
+                setDeleteCandidate(conversation);
+              }}
+              style={styles.hoverDelete}
+            >
               <Ionicons name="trash-outline" size={21} color={theme.muted} />
             </Pressable>
           ) : null}
@@ -237,6 +280,17 @@ export default function MessagesScreen() {
       >
         <GiftGrid theme={theme} />
       </TruefeedModal>
+
+      <TruefeedModal
+        visible={Boolean(deleteCandidate)}
+        theme={theme}
+        title="Supprimer la discussion ?"
+        message={deleteCandidate ? `La conversation avec ${deleteCandidate.name} sera retiree de ta liste.` : undefined}
+        primaryLabel="Supprimer"
+        secondaryLabel="Annuler"
+        onClose={() => setDeleteCandidate(null)}
+        onPrimary={deleteConversation}
+      />
     </ScreenShell>
   );
 }
@@ -256,6 +310,14 @@ function GiftGrid({ theme }: { theme: (typeof seasonThemes)['summer'] }) {
             },
           ]}
         >
+          <View
+            style={[
+              styles.giftIcon,
+              { backgroundColor: gift.unlocked ? gift.color : theme.surfaceAlt },
+            ]}
+          >
+            <Ionicons name={gift.icon} size={21} color={gift.unlocked ? '#FFFFFF' : theme.muted} />
+          </View>
           <Text style={[styles.giftName, { color: theme.text }]}>{gift.name}</Text>
           <Text style={[styles.giftStock, { color: theme.accentStrong }]}>
             {gift.unlocked ? `${gift.stock}x` : 'Bloque'}
@@ -328,17 +390,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  cameraButton: {
+  audioButton: {
     alignItems: 'center',
-    backgroundColor: '#5B4DFF',
-    borderRadius: 24,
-    height: 48,
+    borderRadius: 20,
+    height: 40,
     justifyContent: 'center',
-    width: 48,
+    width: 40,
   },
   chatInput: { flex: 1, fontFamily: fonts.body, fontSize: 18, fontWeight: '800' },
+  hoverDelete: { padding: 10 },
   giftGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   giftCard: { borderRadius: 16, gap: 5, padding: 12, width: '47%' },
+  giftIcon: { alignItems: 'center', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
   giftName: { fontFamily: fonts.body, fontSize: 13, fontWeight: '900' },
   giftStock: { fontFamily: fonts.body, fontSize: 12, fontWeight: '900' },
 });
