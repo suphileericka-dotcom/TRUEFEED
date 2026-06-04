@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { MapExplorer } from '@/components/truefeed/map-explorer';
-import { BrandHeader, Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
+import { BrandHeader, Chip, ScreenShell } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 import { mapApi, type MapPlace } from '@/services/api/map';
@@ -199,8 +199,6 @@ export default function ExploreScreen() {
         badgeIcon={theme.emoji}
         actions={[{ icon: 'navigate' }, { icon: 'filter' }]}
       />
-
-      <SectionLabel theme={theme} label="Carte + pins + fiche lieu" />
 
       <View
         style={[styles.searchBar, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}

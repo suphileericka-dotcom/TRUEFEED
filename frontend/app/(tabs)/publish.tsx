@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -101,6 +102,13 @@ export default function PublishScreen() {
   function publishPost() {
     setPublishState('published');
     setShowPublishModal(false);
+
+    if (format === 'debate' || mediaType === 'text') {
+      router.push('/debate');
+      return;
+    }
+
+    router.push('/(tabs)');
   }
 
   return (
@@ -321,10 +329,12 @@ export default function PublishScreen() {
         </Text>
         <Text style={[styles.statusText, { color: theme.muted }]}>
           {publishState === 'idle'
-            ? 'Complete ton post, ajoute les bons tags, puis publie quand tout est pret.'
+            ? 'Texte ou debat ira dans Debat. Photo et video iront dans l accueil.'
             : publishState === 'draft'
               ? 'Ton contenu est garde de cote pour etre repris plus tard.'
-              : 'Ton post peut maintenant apparaitre dans le feed TRUEFEED.'}
+              : format === 'debate' || mediaType === 'text'
+                ? 'Ton debat peut maintenant apparaitre dans Debat.'
+                : 'Ton post peut maintenant apparaitre dans l accueil.'}
         </Text>
       </View>
 
@@ -332,7 +342,11 @@ export default function PublishScreen() {
         visible={showPublishModal}
         theme={theme}
         title="Publier ce post ?"
-        message="Le post gardera le theme global choisi sur l'accueil et les tags saisonniers selectionnes."
+        message={
+          format === 'debate' || mediaType === 'text'
+            ? 'Ce contenu sera publie dans Debat.'
+            : 'Ce contenu sera publie dans l accueil.'
+        }
         secondaryLabel="Annuler"
         primaryLabel="Publier"
         onClose={() => setShowPublishModal(false)}

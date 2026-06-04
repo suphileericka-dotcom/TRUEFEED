@@ -92,6 +92,7 @@ const FeedCard = memo(function FeedCard({
 }) {
   const [liked, setLiked] = useState(false);
   const [shared, setShared] = useState(false);
+  const [shareNotice, setShareNotice] = useState('');
   const likesCount = liked ? post.likes + 1 : post.likes;
   const sharesCount = shared ? post.shares + 1 : post.shares;
 
@@ -141,10 +142,11 @@ const FeedCard = memo(function FeedCard({
         <Pressable
           onPress={() => {
             setShared(true);
+            setShareNotice('Partage pret');
             Share.share({
               message: `${post.title} - ${post.caption}`,
               title: post.title,
-            }).catch(() => undefined);
+            }).catch(() => setShareNotice('Lien pret a partager'));
           }}
         >
           <Ionicons
@@ -163,6 +165,9 @@ const FeedCard = memo(function FeedCard({
       </Text>
       <Text style={[styles.postTitle, { color: theme.text }]}>{post.title}</Text>
       <Text style={[styles.caption, { color: theme.muted }]}>{post.caption}</Text>
+      {shareNotice ? (
+        <Text style={[styles.shareNotice, { color: theme.accentStrong }]}>{shareNotice}</Text>
+      ) : null}
     </Pressable>
   );
 });
@@ -486,4 +491,11 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   caption: { fontFamily: fonts.body, fontSize: 15, lineHeight: 24, padding: 18, paddingTop: 8 },
+  shareNotice: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    fontWeight: '900',
+    paddingHorizontal: 18,
+    paddingBottom: 16,
+  },
 });
