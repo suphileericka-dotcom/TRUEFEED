@@ -5,10 +5,12 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { BrandHeader, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { useSession } from '@/hooks/use-session';
 
 export default function SignupScreen() {
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
+  const { signIn } = useSession();
   const [displayName, setDisplayName] = useState('Maya');
   const [email, setEmail] = useState('maya@truefeed.test');
 
@@ -47,7 +49,10 @@ export default function SignupScreen() {
         />
 
         <Pressable
-          onPress={() => router.replace('/onboarding')}
+          onPress={() => {
+            signIn();
+            router.replace('/onboarding');
+          }}
           style={[styles.primary, { backgroundColor: theme.accentStrong }]}
         >
           <Text style={styles.primaryText}>Creer le compte</Text>

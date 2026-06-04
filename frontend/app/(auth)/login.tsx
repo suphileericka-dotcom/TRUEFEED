@@ -5,10 +5,12 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { BrandHeader, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { useSession } from '@/hooks/use-session';
 
 export default function LoginScreen() {
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
+  const { signIn } = useSession();
   const [email, setEmail] = useState('maya@truefeed.test');
   const [password, setPassword] = useState('StrongPass123');
 
@@ -42,7 +44,10 @@ export default function LoginScreen() {
         />
 
         <Pressable
-          onPress={() => router.replace('/(tabs)')}
+          onPress={() => {
+            signIn();
+            router.replace('/(tabs)');
+          }}
           style={[styles.primary, { backgroundColor: theme.accentStrong }]}
         >
           <Text style={styles.primaryText}>Se connecter</Text>

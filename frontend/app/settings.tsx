@@ -3,25 +3,49 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { ScreenShell, SectionLabel, TruefeedModal } from '@/components/truefeed/ui';
+import { ScreenShell, SeasonSwitcher, SectionLabel, TruefeedModal } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { useSession } from '@/hooks/use-session';
 
 type Dialog = 'logout' | 'delete' | null;
 
 export default function SettingsScreen() {
-  const { selectedSeason } = useGlobalSeason();
+  const { selectedSeason, setSelectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
+  const { isAuthenticated, hasKnownAccount, signOut, deleteAccount } = useSession();
   const [dialog, setDialog] = useState<Dialog>(null);
 
-  const rows = [
-    { icon: 'notifications-outline' as const, title: 'Notifications', onPress: () => router.push('/notifications') },
-    { icon: 'mail-outline' as const, title: 'Messagerie', onPress: () => router.push('/messages') },
-    { icon: 'log-in-outline' as const, title: 'Se connecter', onPress: () => router.push('/login') },
-    { icon: 'person-add-outline' as const, title: 'Creer un compte', onPress: () => router.push('/signup') },
-    { icon: 'log-out-outline' as const, title: 'Se deconnecter', onPress: () => setDialog('logout') },
-    { icon: 'trash-outline' as const, title: 'Supprimer le compte', onPress: () => setDialog('delete') },
-  ];
+  const rows = isAuthenticated
+    ? [
+        { icon: 'log-out-outline' as const, title: 'Se deconnecter', onPress: () => setDialog('logout') },
+        { icon: 'trash-outline' as const, title: 'Supprimer le compte', onPress: () => setDialog('delete') },
+      ]
+    : [
+        { icon: 'log-in-outline' as const, title: 'Se connecter', onPress: () => router.push('/login') },
+        ...(!hasKnownAccount
+          ? [
+              {
+                icon: 'person-add-outline' as const,
+                title: 'Creer un compte',
+                onPress: () => router.push('/signup'),
+              },
+            ]
+          : []),
+      ];
+
+  function confirmDialog() {
+    if (dialog === 'logout') {
+      signOut();
+    }
+
+    if (dialog === 'delete') {
+      deleteAccount();
+      router.replace('/signup');
+    }
+
+    setDialog(null);
+  }
 
   return (
     <ScreenShell theme={theme}>
@@ -36,8 +60,13 @@ export default function SettingsScreen() {
         </View>
         <Text style={[styles.name, { color: theme.text }]}>Compte TRUEFEED</Text>
         <Text style={[styles.meta, { color: theme.muted }]}>
-          Connecte-toi pour synchroniser posts, votes et profil avec Neon.
+          {isAuthenticated ? 'Connecte' : 'Non connecte'}
         </Text>
+      </View>
+
+      <View style={[styles.themeCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <Text style={[styles.themeTitle, { color: theme.text }]}>Theme</Text>
+        <SeasonSwitcher selectedSeason={selectedSeason} onSelect={setSelectedSeason} />
       </View>
 
       {rows.map((row) => (
@@ -58,13 +87,13 @@ export default function SettingsScreen() {
         title={dialog === 'delete' ? 'Supprimer le compte ?' : 'Se deconnecter ?'}
         message={
           dialog === 'delete'
-            ? 'La suppression definitive doit etre confirmee cote serveur pour retirer les donnees du compte.'
-            : 'La session locale sera fermee. Tu pourras te reconnecter ensuite.'
+            ? 'Cette action supprimera le compte apres confirmation cote serveur.'
+            : 'Tu pourras te reconnecter ensuite.'
         }
         secondaryLabel="Annuler"
         primaryLabel={dialog === 'delete' ? 'Supprimer' : 'Confirmer'}
         onClose={() => setDialog(null)}
-        onPrimary={() => setDialog(null)}
+        onPrimary={confirmDialog}
       />
     </ScreenShell>
   );
@@ -75,7 +104,9 @@ const styles = StyleSheet.create({
   profileCard: { alignItems: 'center', borderRadius: 28, borderWidth: 1, gap: 8, padding: 22 },
   avatar: { alignItems: 'center', borderRadius: 42, height: 84, justifyContent: 'center', width: 84 },
   name: { fontFamily: fonts.title, fontSize: 34, fontWeight: '700' },
-  meta: { fontFamily: fonts.body, fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  meta: { fontFamily: fonts.body, fontSize: 14, fontWeight: '800', lineHeight: 21, textAlign: 'center' },
+  themeCard: { borderRadius: 24, borderWidth: 1, gap: 12, padding: 16 },
+  themeTitle: { fontFamily: fonts.body, fontSize: 16, fontWeight: '900' },
   row: { alignItems: 'center', borderRadius: 20, borderWidth: 1, flexDirection: 'row', gap: 12, padding: 16 },
   rowText: { flex: 1, fontFamily: fonts.body, fontSize: 16, fontWeight: '800' },
 });

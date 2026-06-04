@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { memo, useState } from 'react';
 import { FlatList, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
-import { BrandHeader, Chip, SeasonSwitcher, SectionLabel } from '@/components/truefeed/ui';
+import { BrandHeader, Chip } from '@/components/truefeed/ui';
 import { feedBySeason, fonts, seasonThemes, storyUsers } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 
@@ -148,7 +148,7 @@ const FeedCard = memo(function FeedCard({
 });
 
 export default function HomeScreen() {
-  const { selectedSeason, setSelectedSeason } = useGlobalSeason();
+  const { selectedSeason } = useGlobalSeason();
   const [sort, setSort] = useState<'recent' | 'popular'>('recent');
   const [activeTag, setActiveTag] = useState('Tous');
   const theme = seasonThemes[selectedSeason];
@@ -179,8 +179,6 @@ export default function HomeScreen() {
                 { icon: 'mail', onPress: () => router.push('/messages') },
               ]}
             />
-            <SeasonSwitcher selectedSeason={selectedSeason} onSelect={setSelectedSeason} />
-            <SectionLabel theme={theme} label={`Feed vertical - ${theme.label}`} />
             <View style={styles.skeletonRow}>
               <View style={[styles.skeletonBlock, { backgroundColor: theme.surfaceAlt }]} />
               <View style={[styles.skeletonLine, { backgroundColor: theme.surfaceAlt }]} />

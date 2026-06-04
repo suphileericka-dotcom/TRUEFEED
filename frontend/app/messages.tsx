@@ -8,14 +8,14 @@ import { useGlobalSeason } from '@/hooks/use-global-season';
 
 const messages = [
   {
-    author: 'Equipe TRUEFEED',
-    body: 'Bienvenue. Les conversations privees seront synchronisees avec ton compte.',
+    author: 'Createur TRUEFEED',
+    body: 'Bienvenue sur TRUEFEED. Ici tu recevras les messages officiels et les conversations privees.',
     time: 'Maintenant',
   },
   {
-    author: 'TrueDebate',
-    body: 'Un utilisateur a reagi a un debat que tu suis.',
-    time: '12 min',
+    author: 'maya_explores',
+    body: 'Merci pour ton bon plan, je vais tester ce spot.',
+    time: '18 min',
   },
 ];
 

@@ -7,9 +7,10 @@ import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 
 const notifications = [
+  { title: 'Nouveau like', body: 'nora.nomad a aime ton post.' },
+  { title: 'Nouveau commentaire', body: 'maya_explores a commente ton post Kyoto.' },
   { title: 'Nouveau vote', body: 'Ton debat a recu un vote Pour.' },
-  { title: 'Publication', body: 'Ton prochain post pourra etre publie apres connexion.' },
-  { title: 'Securite', body: 'Les donnees compte sont stockees cote backend PostgreSQL.' },
+  { title: 'Partage', body: 'Un utilisateur a partage ton bon plan.' },
 ];
 
 export default function NotificationsScreen() {
