@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 
 import { BrandHeader, Chip, TruefeedModal } from '@/components/truefeed/ui';
-import { feedBySeason, fonts, seasonThemes, storyUsers } from '@/constants/truefeed';
+import { feedBySeason, fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 
 type FeedPost = {
@@ -30,6 +30,14 @@ type FeedPost = {
   comments: number;
   shares: number;
 };
+
+const storyProfiles = [
+  { name: 'Lucas', avatar: 'L', colors: ['#F9CE34', '#EE2A7B'] },
+  { name: 'Sara', avatar: 'S', colors: ['#F9CE34', '#6228D7'] },
+  { name: 'Karim', avatar: 'K', colors: ['#F9CE34', '#EE2A7B'] },
+  { name: 'Yuna', avatar: 'Y', colors: ['#F9CE34', '#6228D7'] },
+  { name: 'Alex', avatar: 'A', colors: ['#F9CE34', '#EE2A7B'] },
+];
 
 const feedPosts: FeedPost[] = [
   {
@@ -273,18 +281,14 @@ export default function HomeScreen() {
                 </View>
                 <Text style={[styles.storyName, { color: theme.muted }]}>Ta story</Text>
               </Pressable>
-              {storyUsers.map((name, index) => (
-                <View key={name} style={styles.storyItem}>
-                  <View
-                    style={[
-                      styles.storyCircle,
-                      {
-                        borderColor: index % 2 === 0 ? theme.accentStrong : '#59C0C9',
-                        backgroundColor: theme.surface,
-                      },
-                    ]}
-                  />
-                  <Text style={[styles.storyName, { color: theme.muted }]}>{name}</Text>
+              {storyProfiles.map((story) => (
+                <View key={story.name} style={styles.storyItem}>
+                  <View style={[styles.storyRing, { borderColor: story.colors[1] }]}>
+                    <View style={[styles.storyAvatar, { backgroundColor: story.colors[0] }]}>
+                      <Text style={styles.storyAvatarText}>{story.avatar}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.storyName, { color: theme.text }]}>{story.name}</Text>
                 </View>
               ))}
             </ScrollView>
@@ -344,20 +348,45 @@ const styles = StyleSheet.create({
   skeletonRow: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   skeletonBlock: { borderRadius: 18, height: 42, width: 42 },
   skeletonLine: { borderRadius: 999, flex: 1, height: 14 },
-  storyRow: { gap: 18, paddingRight: 20 },
-  storyItem: { alignItems: 'center', gap: 8, width: 78 },
-  storyCircle: { borderRadius: 40, borderWidth: 3, height: 68, width: 68 },
+  storyRow: { gap: 16, paddingRight: 20 },
+  storyItem: { alignItems: 'center', gap: 8, width: 86 },
+  storyCircle: { borderRadius: 46, borderWidth: 3, height: 82, width: 82 },
+  storyRing: {
+    alignItems: 'center',
+    borderRadius: 46,
+    borderWidth: 4,
+    height: 82,
+    justifyContent: 'center',
+    width: 82,
+  },
+  storyAvatar: {
+    alignItems: 'center',
+    borderColor: '#FFFFFF',
+    borderRadius: 38,
+    borderWidth: 3,
+    height: 72,
+    justifyContent: 'center',
+    width: 72,
+  },
+  storyAvatarText: {
+    color: '#FFFFFF',
+    fontFamily: fonts.body,
+    fontSize: 24,
+    fontWeight: '900',
+  },
   storyPlus: {
     alignItems: 'center',
-    borderRadius: 13,
-    bottom: -2,
-    height: 26,
+    borderColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 3,
+    bottom: -4,
+    height: 36,
     justifyContent: 'center',
     position: 'absolute',
-    right: -2,
-    width: 26,
+    right: -6,
+    width: 36,
   },
-  storyName: { fontFamily: fonts.body, fontSize: 13, fontWeight: '700' },
+  storyName: { fontFamily: fonts.body, fontSize: 14, fontWeight: '900' },
   storyComposerPreview: {
     borderRadius: 22,
     minHeight: 220,
