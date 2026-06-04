@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 
 import type { AuthResponse, AuthSession, AuthUser } from '@/services/api/auth';
+import {
+  clearStoredSession,
+  emptySessionState,
+  readStoredSession,
+  writeStoredSession,
+} from '@/services/session-storage';
 
 type SessionState = {
   isAuthenticated: boolean;
@@ -10,84 +16,21 @@ type SessionState = {
 };
 
 const fallbackSession: SessionState = {
-  isAuthenticated: false,
-  hasKnownAccount: false,
-  user: null,
-  session: null,
+  ...emptySessionState,
 };
-
-function readJson<T>(key: string): T | null {
-  if (typeof localStorage === 'undefined') {
-    return null;
-  }
-
-  const raw = localStorage.getItem(key);
-
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-}
-
-function readSession(): SessionState {
-  if (typeof localStorage === 'undefined') {
-    return fallbackSession;
-  }
-
-  return {
-    isAuthenticated: localStorage.getItem('truefeed:isAuthenticated') === 'true',
-    hasKnownAccount: localStorage.getItem('truefeed:hasKnownAccount') === 'true',
-    user: readJson<AuthUser>('truefeed:user'),
-    session: readJson<AuthSession>('truefeed:session'),
-  };
-}
-
-function notifySessionChange() {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('truefeed-session-change'));
-  }
-}
-
-function writeSession(nextSession: SessionState) {
-  if (typeof localStorage === 'undefined') {
-    return;
-  }
-
-  localStorage.setItem('truefeed:isAuthenticated', String(nextSession.isAuthenticated));
-  localStorage.setItem('truefeed:hasKnownAccount', String(nextSession.hasKnownAccount));
-
-  if (nextSession.user) {
-    localStorage.setItem('truefeed:user', JSON.stringify(nextSession.user));
-  } else {
-    localStorage.removeItem('truefeed:user');
-  }
-
-  if (nextSession.session) {
-    localStorage.setItem('truefeed:session', JSON.stringify(nextSession.session));
-  } else {
-    localStorage.removeItem('truefeed:session');
-  }
-
-  notifySessionChange();
-}
 
 export function useSession() {
   const [sessionState, setSessionState] = useState<SessionState>(fallbackSession);
 
   useEffect(() => {
-    setSessionState(readSession());
+    readStoredSession().then(setSessionState).catch(() => setSessionState(fallbackSession));
 
     if (typeof window === 'undefined') {
       return undefined;
     }
 
     function syncSession() {
-      setSessionState(readSession());
+      readStoredSession().then(setSessionState).catch(() => setSessionState(fallbackSession));
     }
 
     window.addEventListener('storage', syncSession);
@@ -106,7 +49,7 @@ export function useSession() {
       user: authResponse.user,
       session: authResponse.session,
     };
-    writeSession(nextSession);
+    writeStoredSession(nextSession);
     setSessionState(nextSession);
   }
 
@@ -117,12 +60,12 @@ export function useSession() {
       user: null,
       session: null,
     };
-    writeSession(nextSession);
+    writeStoredSession(nextSession);
     setSessionState(nextSession);
   }
 
   function deleteAccount() {
-    writeSession(fallbackSession);
+    clearStoredSession(false);
     setSessionState(fallbackSession);
   }
 

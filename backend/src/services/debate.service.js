@@ -143,6 +143,21 @@ async function vote(threadId, value, user) {
   await getThreadRow(threadId);
 
   const normalizedValue = value === 'down' ? 'down' : 'up';
+  const existing = await query(
+    `SELECT value FROM debate_votes
+     WHERE thread_id = $1 AND user_id = $2`,
+    [threadId, user.id],
+  );
+
+  if (existing.rows[0]?.value === normalizedValue) {
+    await query(
+      `DELETE FROM debate_votes
+       WHERE thread_id = $1 AND user_id = $2`,
+      [threadId, user.id],
+    );
+
+    return toThread(await getThreadRow(threadId));
+  }
 
   await query(
     `INSERT INTO debate_votes (thread_id, user_id, value)

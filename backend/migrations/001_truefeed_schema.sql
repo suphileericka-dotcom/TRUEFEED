@@ -238,6 +238,42 @@ CREATE TABLE IF NOT EXISTS places (
 CREATE INDEX IF NOT EXISTS places_category_idx ON places (category);
 CREATE INDEX IF NOT EXISTS places_lat_lng_idx ON places (lat, lng);
 
+CREATE TABLE IF NOT EXISTS good_tips (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  place TEXT NOT NULL,
+  budget TEXT NOT NULL,
+  transport TEXT NOT NULL,
+  rating NUMERIC(3, 1) NOT NULL DEFAULT 8.0,
+  lat DOUBLE PRECISION,
+  lng DOUBLE PRECISION,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT good_tips_place_not_blank CHECK (char_length(btrim(place)) > 0),
+  CONSTRAINT good_tips_budget_not_blank CHECK (char_length(btrim(budget)) > 0),
+  CONSTRAINT good_tips_transport_not_blank CHECK (char_length(btrim(transport)) > 0)
+);
+
+CREATE INDEX IF NOT EXISTS good_tips_location_idx ON good_tips (lat, lng)
+  WHERE lat IS NOT NULL AND lng IS NOT NULL;
+CREATE INDEX IF NOT EXISTS good_tips_user_created_at_idx ON good_tips (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS good_tips_rating_idx ON good_tips (rating DESC, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS user_badges (
+  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  badge_number INTEGER NOT NULL CHECK (badge_number BETWEEN 1 AND 10),
+  unlocked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, badge_number)
+);
+
+CREATE TABLE IF NOT EXISTS user_gifts (
+  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  gift_number INTEGER NOT NULL CHECK (gift_number BETWEEN 1 AND 15),
+  stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+  unlocked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, gift_number)
+);
+
 CREATE TABLE IF NOT EXISTS media_assets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id UUID REFERENCES users (id) ON DELETE SET NULL,

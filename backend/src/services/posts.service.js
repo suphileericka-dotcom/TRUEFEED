@@ -318,6 +318,74 @@ async function getPost(postId) {
   return toPost(result.rows[0]);
 }
 
+async function assertPostOwner(postId, user) {
+  const result = await query(`SELECT author_id FROM posts WHERE id = $1`, [postId]);
+
+  if (result.rowCount === 0) {
+    throw createHttpError(404, 'post_not_found', 'Post introuvable.');
+  }
+
+  if (result.rows[0].author_id !== user.id) {
+    throw createHttpError(403, 'post_forbidden', 'Tu ne peux modifier que tes propres posts.');
+  }
+}
+
+async function updatePost(postId, payload, user) {
+  assertUuid(postId, 'postId');
+  await assertPostOwner(postId, user);
+
+  const caption = String(payload.caption || '').trim();
+
+  if (caption.length < 2 || caption.length > 2200) {
+    throw createHttpError(
+      400,
+      'invalid_caption',
+      'La legende doit faire entre 2 et 2200 caracteres.',
+    );
+  }
+
+  const result = await query(
+    `UPDATE posts
+     SET title = $1,
+         caption = $2,
+         location = $3,
+         season = $4,
+         updated_at = now()
+     WHERE id = $5
+     RETURNING *`,
+    [
+      payload.title || null,
+      caption,
+      payload.location || null,
+      payload.season || null,
+      postId,
+    ],
+  );
+
+  invalidateFeedCache();
+  return toPost({
+    ...result.rows[0],
+    author_username: user.username,
+    tags: normalizeTags(payload.tags || []),
+  });
+}
+
+async function deletePost(postId, user) {
+  assertUuid(postId, 'postId');
+  await assertPostOwner(postId, user);
+
+  await query(
+    `UPDATE posts
+     SET status = 'deleted',
+         updated_at = now()
+     WHERE id = $1`,
+    [postId],
+  );
+
+  invalidateFeedCache();
+  return { deleted: true };
+}
+
 async function listComments(postId) {
   await getPost(postId);
 
@@ -407,11 +475,13 @@ async function sharePost(postId, user = null) {
 const postsService = {
   addComment,
   createPost,
+  deletePost,
   getPost,
   listComments,
   listFeed,
   sharePost,
   toggleLike,
+  updatePost,
 };
 
 module.exports = {

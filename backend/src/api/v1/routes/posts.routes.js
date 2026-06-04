@@ -65,6 +65,36 @@ postsV1Router.get('/:postId', async (req, res, next) => {
   }
 });
 
+postsV1Router.patch('/:postId', requireAuth, async (req, res, next) => {
+  try {
+    const payload = validate(createPostSchema, {
+      ...req.body,
+      mediaType: req.body.mediaType || 'text',
+      format: req.body.format || 'photo',
+    });
+    const post = await postsService.updatePost(
+      req.params.postId,
+      {
+        ...payload,
+        tags: Array.isArray(req.body.tags) ? req.body.tags : [],
+      },
+      req.user,
+    );
+
+    res.json({ post });
+  } catch (error) {
+    next(error);
+  }
+});
+
+postsV1Router.delete('/:postId', requireAuth, async (req, res, next) => {
+  try {
+    res.json(await postsService.deletePost(req.params.postId, req.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
 postsV1Router.get('/:postId/comments', async (req, res, next) => {
   try {
     res.json({

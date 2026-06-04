@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -80,7 +81,20 @@ export default function MessagesScreen() {
   const [hoveredConversationId, setHoveredConversationId] = useState<string | null>(null);
   const [deleteCandidate, setDeleteCandidate] = useState<Conversation | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const visibleConversations = tab === 'messages' ? conversationList : requests;
+  const [isSearching, setIsSearching] = useState(false);
+  const [conversationSearch, setConversationSearch] = useState('');
+  const visibleConversations = (tab === 'messages' ? conversationList : requests).filter((conversation) => {
+    const search = conversationSearch.trim().toLowerCase();
+
+    if (!search) {
+      return true;
+    }
+
+    return (
+      conversation.name.toLowerCase().includes(search) ||
+      conversation.username.toLowerCase().includes(search)
+    );
+  });
 
   function sendMessage() {
     const cleanMessage = messageText.trim();
@@ -210,12 +224,35 @@ export default function MessagesScreen() {
   return (
     <ScreenShell theme={theme} contentContainerStyle={styles.listContent}>
       <View style={styles.inboxHeader}>
+        <Ionicons name="chevron-back" size={34} color={theme.text} onPress={() => router.push('/')} />
         <View style={styles.inboxTitleCenter}>
           <Text style={[styles.inboxTitle, { color: theme.text }]}>suphile_</Text>
           <Ionicons name="chevron-down" size={22} color={theme.text} />
         </View>
-        <Ionicons name="create-outline" size={28} color={theme.text} />
+        <Ionicons
+          name={isSearching ? 'close-circle-outline' : 'search-outline'}
+          size={28}
+          color={theme.text}
+          onPress={() => {
+            setIsSearching((current) => !current);
+            setConversationSearch('');
+          }}
+        />
       </View>
+
+      {isSearching ? (
+        <View style={[styles.searchBox, { backgroundColor: theme.surfaceAlt }]}>
+          <Ionicons name="search-outline" size={20} color={theme.muted} />
+          <TextInput
+            value={conversationSearch}
+            onChangeText={setConversationSearch}
+            autoFocus
+            placeholder="Chercher une personne"
+            placeholderTextColor={theme.muted}
+            style={[styles.searchInput, { color: theme.text }]}
+          />
+        </View>
+      ) : null}
 
       <View style={styles.inboxTabs}>
         <Pressable onPress={() => setTab('messages')}>
@@ -338,9 +375,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 5,
     justifyContent: 'center',
-    paddingLeft: 28,
+    paddingHorizontal: 8,
   },
   inboxTitle: { fontFamily: fonts.body, fontSize: 34, fontWeight: '900' },
+  searchBox: {
+    alignItems: 'center',
+    borderRadius: 18,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 16, fontWeight: '800' },
   inboxTabs: { flexDirection: 'row', justifyContent: 'space-between' },
   tabTitle: { fontFamily: fonts.body, fontSize: 24, fontWeight: '900' },
   badgeStrip: { alignItems: 'center', borderRadius: 22, flexDirection: 'row', gap: 10, padding: 12 },

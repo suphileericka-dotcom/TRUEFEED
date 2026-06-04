@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ScreenShell, TruefeedModal } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 import { useSession } from '@/hooks/use-session';
+import { goodTipsApi } from '@/services/api/good-tips';
 
 const badgeMilestones = [5, 10, 15, 20, 25, 30, 33, 35, 50, 75];
 const badgeColors = ['#F59E0B', '#06B6D4', '#8B5CF6', '#EF4444', '#10B981', '#F97316', '#3B82F6', '#EC4899', '#14B8A6', '#111827'];
@@ -50,7 +51,26 @@ export default function BonPlanScreen() {
   const nextBadge = badgeMilestones.find((milestone) => milestone > sharedCount);
   const sortedPlans = useMemo(() => [...plans].sort((a, b) => b.rating - a.rating), [plans]);
 
-  function addPlan() {
+  useEffect(() => {
+    goodTipsApi
+      .list()
+      .then((response) => {
+        if (response.items.length > 0) {
+          setPlans(
+            response.items.map((tip) => ({
+              place: tip.place,
+              budget: tip.budget,
+              transport: tip.transport,
+              rating: tip.rating,
+              author: tip.author,
+            })),
+          );
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
+  async function addPlan() {
     if (!isAuthenticated) {
       router.push('/login');
       return;
@@ -60,13 +80,31 @@ export default function BonPlanScreen() {
       return;
     }
 
-    setPlans((current) => [
-      { place, budget, transport, rating: 8.9, author: 'toi' },
-      ...current,
-    ]);
-    setPlace('');
-    setBudget('');
-    setTransport('');
+    try {
+      const result = await goodTipsApi.create({ place, budget, transport });
+
+      setPlans((current) => [
+        {
+          place: result.tip.place,
+          budget: result.tip.budget,
+          transport: result.tip.transport,
+          rating: result.tip.rating,
+          author: result.tip.author,
+        },
+        ...current,
+      ]);
+      setPlace('');
+      setBudget('');
+      setTransport('');
+    } catch {
+      setPlans((current) => [
+        { place, budget, transport, rating: 8.9, author: 'toi' },
+        ...current,
+      ]);
+      setPlace('');
+      setBudget('');
+      setTransport('');
+    }
   }
 
   return (
