@@ -6,6 +6,8 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { useSession } from '@/hooks/use-session';
+import { postsApi } from '@/services/api/posts';
 
 const comments = [
   { id: 'c1', author: 'lucas.trips', content: 'Le conseil horaire est parfait, teste ce matin.' },
@@ -20,9 +22,80 @@ const comments = [
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { selectedSeason } = useGlobalSeason();
+  const { isAuthenticated } = useSession();
   const theme = seasonThemes[selectedSeason];
   const [liked, setLiked] = useState(false);
   const [comment, setComment] = useState('');
+  const [visibleComments, setVisibleComments] = useState(
+    comments.map((item, index) => ({ ...item, likesCount: index + 1 })),
+  );
+  const [replyTo, setReplyTo] = useState<(typeof visibleComments)[number] | null>(null);
+  const [shared, setShared] = useState(false);
+
+  async function sendComment() {
+    const content = comment.trim();
+
+    if (!content) {
+      return;
+    }
+
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      const result = await postsApi.comment(String(id), {
+        content,
+        parentId: replyTo?.id,
+      });
+
+      setVisibleComments((current) => [
+        ...current,
+        {
+          id: result.comment.id,
+          author: result.comment.author,
+          content: result.comment.content,
+          likesCount: result.comment.likesCount,
+        },
+      ]);
+    } catch {
+      setVisibleComments((current) => [
+        ...current,
+        {
+          id: String(Date.now()),
+          author: 'toi',
+          content: replyTo ? `@${replyTo.author} ${content}` : content,
+          likesCount: 0,
+        },
+      ]);
+    }
+
+    setComment('');
+    setReplyTo(null);
+  }
+
+  async function likeComment(commentId: string) {
+    setVisibleComments((current) =>
+      current.map((item) =>
+        item.id === commentId ? { ...item, likesCount: item.likesCount + 1 } : item,
+      ),
+    );
+
+    if (isAuthenticated) {
+      await postsApi.likeComment(commentId).catch(() => undefined);
+    }
+  }
+
+  async function sharePost() {
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+
+    const result = await postsApi.share(String(id)).catch(() => null);
+    setShared(Boolean(result?.shared));
+  }
 
   return (
     <ScreenShell theme={theme}>
@@ -68,23 +141,37 @@ export default function PostDetailScreen() {
             <Ionicons name="chatbubble-outline" size={22} color={theme.accentStrong} />
             <Text style={[styles.actionText, { color: theme.text }]}>31</Text>
           </View>
-          <View style={styles.action}>
+          <Pressable onPress={sharePost} style={styles.action}>
             <Ionicons name="share-social-outline" size={22} color={theme.accentStrong} />
-            <Text style={[styles.actionText, { color: theme.text }]}>Partager</Text>
-          </View>
+            <Text style={[styles.actionText, { color: theme.text }]}>{shared ? 'Repartage' : 'Partager'}</Text>
+          </Pressable>
         </View>
       </View>
 
       <Text style={[styles.blockTitle, { color: theme.text }]}>Commentaires</Text>
-      {comments.map((item) => (
+      {visibleComments.map((item) => (
         <View
           key={item.id}
           style={[styles.comment, { backgroundColor: theme.surface, borderColor: theme.border }]}
         >
           <Text style={[styles.commentAuthor, { color: theme.text }]}>{item.author}</Text>
           <Text style={[styles.commentText, { color: theme.muted }]}>{item.content}</Text>
+          <View style={styles.commentActions}>
+            <Pressable onPress={() => likeComment(item.id)} style={styles.action}>
+              <Ionicons name="heart-outline" size={18} color={theme.accentStrong} />
+              <Text style={[styles.actionText, { color: theme.text }]}>{item.likesCount}</Text>
+            </Pressable>
+            <Pressable onPress={() => setReplyTo(item)} style={styles.action}>
+              <Ionicons name="return-down-forward-outline" size={18} color={theme.accentStrong} />
+              <Text style={[styles.actionText, { color: theme.text }]}>Repondre</Text>
+            </Pressable>
+          </View>
         </View>
       ))}
+
+      {replyTo ? (
+        <Text style={[styles.replyHint, { color: theme.accentStrong }]}>Reponse a {replyTo.author}</Text>
+      ) : null}
 
       <View
         style={[
@@ -99,7 +186,7 @@ export default function PostDetailScreen() {
           style={[styles.commentInput, { color: theme.text }]}
           value={comment}
         />
-        <Pressable style={[styles.sendButton, { backgroundColor: theme.accentStrong }]}>
+        <Pressable onPress={sendComment} style={[styles.sendButton, { backgroundColor: theme.accentStrong }]}>
           <Ionicons name="send" size={18} color="#FFFFFF" />
         </Pressable>
       </View>
@@ -129,6 +216,8 @@ const styles = StyleSheet.create({
   comment: { borderRadius: 22, borderWidth: 1, gap: 6, padding: 16 },
   commentAuthor: { fontFamily: fonts.body, fontSize: 15, fontWeight: '800' },
   commentText: { fontFamily: fonts.body, fontSize: 15, lineHeight: 23 },
+  commentActions: { flexDirection: 'row', gap: 16, paddingTop: 4 },
+  replyHint: { fontFamily: fonts.body, fontSize: 13, fontWeight: '900' },
   commentComposer: {
     alignItems: 'center',
     borderRadius: 22,

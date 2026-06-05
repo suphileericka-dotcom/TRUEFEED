@@ -7,23 +7,24 @@ import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 import { useSession } from '@/hooks/use-session';
 import { authApi } from '@/services/api/auth';
+import { ApiError } from '@/services/api/client';
 
 export default function LoginScreen() {
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
   const { signIn } = useSession();
-  const [email, setEmail] = useState('nsuphile@gmail.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState('');
 
   async function login() {
     try {
       setStatus('Connexion...');
-      const result = await authApi.login({ email, password });
+      const result = await authApi.login({ email: email.trim().toLowerCase(), password });
       signIn(result);
       router.replace('/(tabs)');
-    } catch {
-      setStatus('Email ou mot de passe incorrect.');
+    } catch (error) {
+      setStatus(error instanceof ApiError ? error.message : 'Email ou mot de passe incorrect.');
     }
   }
 

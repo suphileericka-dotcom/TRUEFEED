@@ -23,6 +23,7 @@ export type AuthSession = {
 export type AuthResponse = {
   user: AuthUser;
   session: AuthSession;
+  emailVerificationRequired?: boolean;
 };
 
 export const authApi = {
@@ -37,6 +38,10 @@ export const authApi = {
     displayName: string;
   }) {
     return apiClient.post<AuthResponse, typeof payload>('/api/v1/auth/register', payload);
+  },
+
+  verifyEmail(payload: { email: string; code: string }) {
+    return apiClient.post<{ verified: boolean }, typeof payload>('/api/v1/auth/verify-email', payload);
   },
 
   logout(refreshToken: string) {

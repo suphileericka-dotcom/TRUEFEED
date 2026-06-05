@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ScreenShell, TruefeedModal } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { useSession } from '@/hooks/use-session';
 
 type MessageTab = 'messages' | 'requests';
 
@@ -49,12 +50,21 @@ const requests: Conversation[] = [
 ];
 
 const gifts = [
-  { name: 'Confettis', stock: 3, unlocked: true, icon: 'sparkles' as const, color: '#F59E0B' },
-  { name: 'Emoji Geant', stock: 5, unlocked: true, icon: 'happy-outline' as const, color: '#8B5CF6' },
+  { name: 'Confettis', stock: 0, unlocked: false, icon: 'sparkles' as const, color: '#F59E0B' },
+  { name: 'Emoji Geant', stock: 0, unlocked: false, icon: 'happy-outline' as const, color: '#8B5CF6' },
   { name: 'Applaudissements', stock: 0, unlocked: false, icon: 'heart-outline' as const, color: '#EF4444' },
   { name: 'Meteo Mood', stock: 0, unlocked: false, icon: 'cloud-outline' as const, color: '#0EA5E9' },
+  { name: 'Surnom Secret', stock: 0, unlocked: false, icon: 'pricetag-outline' as const, color: '#EC4899' },
+  { name: 'Fausse Alerte', stock: 0, unlocked: false, icon: 'notifications-outline' as const, color: '#F97316' },
+  { name: 'Fantome de Relations', stock: 0, unlocked: false, icon: 'chatbubble-ellipses-outline' as const, color: '#6366F1' },
+  { name: 'Fete Grimace', stock: 0, unlocked: false, icon: 'people-outline' as const, color: '#84CC16' },
+  { name: 'Boost Visibilite', stock: 0, unlocked: false, icon: 'trending-up-outline' as const, color: '#22C55E' },
+  { name: 'Archiviste', stock: 0, unlocked: false, icon: 'bookmark-outline' as const, color: '#64748B' },
   { name: 'Mystique Charme', stock: 0, unlocked: false, icon: 'mail-outline' as const, color: '#EC4899' },
-  { name: 'Recap Magique', stock: 0, unlocked: false, icon: 'reader-outline' as const, color: '#10B981' },
+  { name: 'Capsule temporelle', stock: 0, unlocked: false, icon: 'time-outline' as const, color: '#06B6D4' },
+  { name: 'Mode Fantome', stock: 0, unlocked: false, icon: 'eye-off-outline' as const, color: '#111827' },
+  { name: 'Traducteur Universel', stock: 0, unlocked: false, icon: 'language-outline' as const, color: '#14B8A6' },
+  { name: 'Resume Magique', stock: 1, unlocked: true, icon: 'reader-outline' as const, color: '#10B981' },
 ];
 
 const starterMessages: ChatMessage[] = [
@@ -71,6 +81,7 @@ const starterMessages: ChatMessage[] = [
 
 export default function MessagesScreen() {
   const { selectedSeason } = useGlobalSeason();
+  const { isAuthenticated, user } = useSession();
   const theme = seasonThemes[selectedSeason];
   const [tab, setTab] = useState<MessageTab>('messages');
   const [conversationList, setConversationList] = useState(conversations);
@@ -83,6 +94,15 @@ export default function MessagesScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [conversationSearch, setConversationSearch] = useState('');
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setConversationList([]);
+      setMessages([]);
+      setSelectedConversation(null);
+    }
+  }, [isAuthenticated]);
+
   const visibleConversations = (tab === 'messages' ? conversationList : requests).filter((conversation) => {
     const search = conversationSearch.trim().toLowerCase();
 
@@ -212,7 +232,7 @@ export default function MessagesScreen() {
           visible={showGifts}
           theme={theme}
           title="Tes cadeaux"
-          message="Choisis un cadeau debloque a envoyer dans la conversation."
+          message="Resume Magique est ton cadeau de bienvenue. Les autres cadeaux restent bloques."
           onClose={() => setShowGifts(false)}
         >
           <GiftGrid theme={theme} />
@@ -271,8 +291,7 @@ export default function MessagesScreen() {
         <View style={[styles.badge, { backgroundColor: theme.accentSoft }]}>
           <Text style={[styles.badgeText, { color: theme.accentStrong }]}>B5</Text>
         </View>
-        <Text style={[styles.badgeCopy, { color: theme.text }]}>Suphile NTSIMBA</Text>
-        <Text style={[styles.badgeMeta, { color: theme.muted }]}>Voir mes cadeaux</Text>
+        <Text style={[styles.badgeCopy, { color: theme.text }]}>{user?.displayName || user?.username || 'Badge'}</Text>
       </Pressable>
 
       {visibleConversations.map((conversation) => (
@@ -312,7 +331,7 @@ export default function MessagesScreen() {
         visible={showGifts}
         theme={theme}
         title="Tes cadeaux"
-        message="Les cadeaux gris ne sont pas encore debloques."
+        message="Resume Magique est ton cadeau de bienvenue. Les autres cadeaux restent bloques."
         onClose={() => setShowGifts(false)}
       >
         <GiftGrid theme={theme} />

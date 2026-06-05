@@ -32,6 +32,11 @@ const refreshSchema = {
   refreshToken: { type: 'string', required: true, minLength: 20 },
 };
 
+const verifyEmailSchema = {
+  email: { type: 'string', required: true, email: true, maxLength: 160 },
+  code: { type: 'string', required: true, minLength: 6, maxLength: 6 },
+};
+
 authV1Router.post('/register', async (req, res, next) => {
   try {
     const payload = validate(registerSchema, req.body);
@@ -39,6 +44,17 @@ authV1Router.post('/register', async (req, res, next) => {
 
     analyticsService.track('signup', { userId: result.user.id, role: result.user.role });
     res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+authV1Router.post('/verify-email', async (req, res, next) => {
+  try {
+    const payload = validate(verifyEmailSchema, req.body);
+    const result = await authService.verifyEmail(payload);
+
+    res.json(result);
   } catch (error) {
     next(error);
   }

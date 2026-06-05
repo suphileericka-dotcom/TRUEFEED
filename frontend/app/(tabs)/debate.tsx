@@ -36,7 +36,7 @@ export default function DebateScreen() {
   const [reply, setReply] = useState('');
   const [filter, setFilter] = useState<DebateFilter>('popular');
   const [votes, setVotes] = useState<Record<string, VoteValue>>({});
-  const [reposts, setReposts] = useState<Record<string, number>>({});
+  const [reposts, setReposts] = useState<Record<string, boolean>>({});
   const [replies, setReplies] = useState<Record<string, string[]>>({});
 
   const visibleTopics = useMemo(() => {
@@ -56,7 +56,7 @@ export default function DebateScreen() {
   }
 
   function repost(topicId: string) {
-    setReposts((current) => ({ ...current, [topicId]: (current[topicId] ?? 0) + 1 }));
+    setReposts((current) => ({ ...current, [topicId]: !current[topicId] }));
   }
 
   function shareTopic(topic: (typeof debateTopics)[number]) {
@@ -135,8 +135,12 @@ export default function DebateScreen() {
               <Text style={[styles.actionText, { color: theme.muted }]}>{commentCount}</Text>
             </Pressable>
             <Pressable onPress={() => repost(topic.id)} style={styles.actionButton}>
-              <Ionicons name="repeat-outline" size={24} color={theme.muted} />
-              <Text style={[styles.actionText, { color: theme.muted }]}>{reposts[topic.id] ?? 0}</Text>
+              <Ionicons
+                name={reposts[topic.id] ? 'repeat' : 'repeat-outline'}
+                size={24}
+                color={reposts[topic.id] ? theme.accentStrong : theme.muted}
+              />
+              <Text style={[styles.actionText, { color: theme.muted }]}>{reposts[topic.id] ? 1 : 0}</Text>
             </Pressable>
             <Pressable onPress={() => shareTopic(topic)} style={styles.actionButton}>
               <Ionicons name="paper-plane-outline" size={24} color={theme.muted} />

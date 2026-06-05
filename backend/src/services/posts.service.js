@@ -149,6 +149,7 @@ function toComment(row) {
     parentId: row.parent_id,
     content: row.content,
     status: row.status,
+    likesCount: row.likes_count || 0,
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
   };
@@ -390,10 +391,15 @@ async function listComments(postId) {
   await getPost(postId);
 
   const result = await query(
-    `SELECT comments.*, users.username AS author_username
+    `SELECT
+       comments.*,
+       users.username AS author_username,
+       COUNT(likes.id)::INTEGER AS likes_count
      FROM comments
      INNER JOIN users ON users.id = comments.author_id
+     LEFT JOIN likes ON likes.comment_id = comments.id
      WHERE comments.post_id = $1 AND comments.status = 'published'
+     GROUP BY comments.id, users.username
      ORDER BY comments.created_at ASC`,
     [postId],
   );
@@ -405,6 +411,7 @@ async function addComment(postId, payload, user) {
   await getPost(postId);
 
   const content = String(payload.content || '').trim();
+  const parentId = payload.parentId || null;
 
   if (content.length < 2 || content.length > 800) {
     throw createHttpError(
@@ -416,11 +423,24 @@ async function addComment(postId, payload, user) {
 
   assertNoSpam(commentAttemptsByUser, user.id, content, 10, 10 * 60 * 1000);
 
+  if (parentId) {
+    assertUuid(parentId, 'parentId');
+
+    const parentResult = await query(
+      `SELECT id FROM comments WHERE id = $1 AND post_id = $2 AND status = 'published'`,
+      [parentId, postId],
+    );
+
+    if (parentResult.rowCount === 0) {
+      throw createHttpError(404, 'parent_comment_not_found', 'Commentaire parent introuvable.');
+    }
+  }
+
   const result = await query(
-    `INSERT INTO comments (post_id, author_id, content)
-     VALUES ($1, $2, $3)
+    `INSERT INTO comments (post_id, author_id, parent_id, content)
+     VALUES ($1, $2, $3, $4)
      RETURNING *`,
-    [postId, user.id, content],
+    [postId, user.id, parentId, content],
   );
   const comment = toComment({
     ...result.rows[0],
@@ -429,6 +449,43 @@ async function addComment(postId, payload, user) {
 
   invalidateFeedCache();
   return comment;
+}
+
+async function toggleCommentLike(commentId, user) {
+  assertUuid(commentId, 'commentId');
+
+  const commentResult = await query(
+    `SELECT id FROM comments WHERE id = $1 AND status = 'published'`,
+    [commentId],
+  );
+
+  if (commentResult.rowCount === 0) {
+    throw createHttpError(404, 'comment_not_found', 'Commentaire introuvable.');
+  }
+
+  const deleted = await query(
+    `DELETE FROM likes
+     WHERE user_id = $1 AND comment_id = $2
+     RETURNING id`,
+    [user.id, commentId],
+  );
+  const liked = deleted.rowCount === 0;
+
+  if (liked) {
+    await query(
+      `INSERT INTO likes (user_id, comment_id)
+       VALUES ($1, $2)
+       ON CONFLICT DO NOTHING`,
+      [user.id, commentId],
+    );
+  }
+
+  const likesResult = await query(
+    `SELECT COUNT(*)::INTEGER AS count FROM likes WHERE comment_id = $1`,
+    [commentId],
+  );
+
+  return { liked, likesCount: likesResult.rows[0].count };
 }
 
 async function toggleLike(postId, user) {
@@ -457,19 +514,25 @@ async function toggleLike(postId, user) {
   return { liked, likesCount: postResult.rows[0].likes_count };
 }
 
-async function sharePost(postId, user = null) {
+async function sharePost(postId, user) {
   await getPost(postId);
 
   const result = await query(
     `INSERT INTO post_shares (post_id, user_id)
      VALUES ($1, $2)
+     ON CONFLICT (post_id, user_id) WHERE user_id IS NOT NULL
+     DO NOTHING
      RETURNING id`,
-    [postId, user?.id || null],
+    [postId, user.id],
   );
   const postResult = await query(`SELECT shares_count FROM posts WHERE id = $1`, [postId]);
 
   invalidateFeedCache();
-  return { shareId: result.rows[0].id, sharesCount: postResult.rows[0].shares_count };
+  return {
+    shared: result.rowCount > 0,
+    shareId: result.rows[0]?.id || null,
+    sharesCount: postResult.rows[0].shares_count,
+  };
 }
 
 const postsService = {
@@ -480,6 +543,7 @@ const postsService = {
   listComments,
   listFeed,
   sharePost,
+  toggleCommentLike,
   toggleLike,
   updatePost,
 };

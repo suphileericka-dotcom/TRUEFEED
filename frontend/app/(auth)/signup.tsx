@@ -8,6 +8,7 @@ import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 import { useSession } from '@/hooks/use-session';
 import { authApi } from '@/services/api/auth';
+import { ApiError } from '@/services/api/client';
 
 export default function SignupScreen() {
   const { selectedSeason } = useGlobalSeason();
@@ -17,9 +18,25 @@ export default function SignupScreen() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [pendingAuth, setPendingAuth] = useState<Awaited<ReturnType<typeof authApi.register>> | null>(null);
   const [status, setStatus] = useState('');
 
   async function signup() {
+    const cleanUsername = username.trim().toLowerCase();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanDisplayName = displayName.trim();
+
+    if (cleanDisplayName.length < 2) {
+      setStatus('Ajoute le nom que tu veux afficher sur ton profil.');
+      return;
+    }
+
+    if (!/^[a-z0-9._]{3,32}$/.test(cleanUsername)) {
+      setStatus('Choisis un nom utilisateur de 3 a 32 caracteres: lettres, chiffres, point ou tiret bas.');
+      return;
+    }
+
     if (password.length < 8) {
       setStatus('Le mot de passe doit contenir au moins 8 caracteres.');
       return;
@@ -28,15 +45,43 @@ export default function SignupScreen() {
     try {
       setStatus('Creation du compte...');
       const result = await authApi.register({
-        username,
-        email,
+        username: cleanUsername,
+        email: cleanEmail,
         password,
-        displayName,
+        displayName: cleanDisplayName,
       });
-      signIn(result);
+      setPendingAuth(result);
+      setStatus('Un code a ete envoye par email. Entre-le pour finaliser ton compte.');
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'username_taken') {
+        setStatus('Ce nom utilisateur est deja pris. Choisis un autre nom.');
+        return;
+      }
+
+      if (error instanceof ApiError && error.code === 'email_taken') {
+        setStatus('Cet email a deja un compte. Connecte-toi ou utilise un autre email.');
+        return;
+      }
+
+      setStatus(error instanceof ApiError ? error.message : 'Impossible de creer le compte avec ces informations.');
+    }
+  }
+
+  async function verifyCode() {
+    if (!pendingAuth) {
+      return;
+    }
+
+    try {
+      setStatus('Verification du code...');
+      await authApi.verifyEmail({
+        email: pendingAuth.user.email,
+        code: verificationCode.trim(),
+      });
+      signIn(pendingAuth);
       router.replace('/onboarding');
     } catch {
-      setStatus('Impossible de creer le compte avec ces informations.');
+      setStatus('Code invalide ou expire. Verifie ton email et reessaie.');
     }
   }
 
@@ -87,11 +132,22 @@ export default function SignupScreen() {
           value={password}
         />
 
+        {pendingAuth ? (
+          <TextInput
+            keyboardType="number-pad"
+            onChangeText={setVerificationCode}
+            placeholder="Code email"
+            placeholderTextColor={theme.muted}
+            style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
+            value={verificationCode}
+          />
+        ) : null}
+
         <Pressable
-          onPress={signup}
+          onPress={pendingAuth ? verifyCode : signup}
           style={[styles.primary, { backgroundColor: theme.accentStrong }]}
         >
-          <Text style={styles.primaryText}>Creer le compte</Text>
+          <Text style={styles.primaryText}>{pendingAuth ? 'Valider le code' : 'Creer le compte'}</Text>
         </Pressable>
         {status ? <Text style={[styles.status, { color: theme.muted }]}>{status}</Text> : null}
         <Link href="/login">

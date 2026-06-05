@@ -12,6 +12,20 @@ type RequestOptions = RequestInit & {
   skipAuthRefresh?: boolean;
 };
 
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  details?: unknown;
+
+  constructor(message: string, status: number, code?: string, details?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+}
+
 async function request<TResponse>(path: string, options: RequestOptions = {}): Promise<TResponse> {
   const headers = new Headers(options.headers);
   const storedSession = await readStoredSession();
@@ -44,7 +58,20 @@ async function request<TResponse>(path: string, options: RequestOptions = {}): P
   }
 
   if (!response.ok) {
-    const error = new Error(`API request failed: ${response.status} ${response.statusText}`);
+    let payload: { error?: string; message?: string; details?: unknown } | null = null;
+
+    try {
+      payload = (await response.json()) as typeof payload;
+    } catch {
+      payload = null;
+    }
+
+    const error = new ApiError(
+      payload?.message || `API request failed: ${response.status} ${response.statusText}`,
+      response.status,
+      payload?.error,
+      payload?.details,
+    );
     trackError(error, { path, status: response.status });
     throw error;
   }

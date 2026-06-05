@@ -64,6 +64,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS users_username_key ON users (lower(username));
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_key ON users (lower(email));
 CREATE INDEX IF NOT EXISTS users_status_created_at_idx ON users (status, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS email_verification_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  code_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS email_verification_codes_user_active_idx
+  ON email_verification_codes (user_id, expires_at DESC)
+  WHERE used_at IS NULL;
+
 CREATE TABLE IF NOT EXISTS refresh_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -183,6 +196,8 @@ CREATE TABLE IF NOT EXISTS post_shares (
 
 CREATE INDEX IF NOT EXISTS post_shares_post_created_at_idx ON post_shares (post_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS post_shares_user_created_at_idx ON post_shares (user_id, created_at DESC)
+  WHERE user_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS post_shares_user_post_key ON post_shares (post_id, user_id)
   WHERE user_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS debate_threads (

@@ -19,6 +19,7 @@ const createPostSchema = {
 
 const commentSchema = {
   content: { type: 'string', required: true, minLength: 2, maxLength: 800 },
+  parentId: { type: 'string' },
 };
 
 postsV1Router.get('/feed', async (req, res, next) => {
@@ -121,6 +122,21 @@ postsV1Router.post('/:postId/comments', requireAuth, async (req, res, next) => {
   }
 });
 
+postsV1Router.post('/comments/:commentId/like', requireAuth, async (req, res, next) => {
+  try {
+    const result = await postsService.toggleCommentLike(req.params.commentId, req.user);
+
+    analyticsService.track('comment_like_toggle', {
+      commentId: req.params.commentId,
+      userId: req.user.id,
+      liked: result.liked,
+    });
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 postsV1Router.post('/:postId/like', requireAuth, async (req, res, next) => {
   try {
     const result = await postsService.toggleLike(req.params.postId, req.user);
@@ -136,7 +152,7 @@ postsV1Router.post('/:postId/like', requireAuth, async (req, res, next) => {
   }
 });
 
-postsV1Router.post('/:postId/share', async (req, res, next) => {
+postsV1Router.post('/:postId/share', requireAuth, async (req, res, next) => {
   try {
     const result = await postsService.sharePost(req.params.postId, req.user);
 

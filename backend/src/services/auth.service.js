@@ -1,7 +1,8 @@
 const crypto = require('crypto');
 
 const { authConfig } = require('../config/auth');
-const { query } = require('../data/db');
+const { query, transaction } = require('../data/db');
+const { mailService } = require('./mail.service');
 const { createHttpError } = require('../utils/httpError');
 
 function base64UrlEncode(value) {
@@ -90,6 +91,10 @@ function hashToken(token) {
   return crypto.createHmac('sha256', authConfig.refreshToken.secret).update(token).digest('hex');
 }
 
+function hashVerificationCode(code) {
+  return crypto.createHmac('sha256', authConfig.refreshToken.secret).update(code).digest('hex');
+}
+
 function toPublicUser(row) {
   return {
     id: row.id,
@@ -142,54 +147,120 @@ async function createSession(user) {
 }
 
 async function register(payload) {
+  const username = String(payload.username || '').trim().toLowerCase();
+  const email = String(payload.email || '').trim().toLowerCase();
+
+  if (!/^[a-z0-9._]{3,32}$/.test(username)) {
+    throw createHttpError(
+      400,
+      'invalid_username',
+      'Nom utilisateur invalide: lettres, chiffres, point ou tiret bas uniquement.',
+    );
+  }
+
   const existing = await query(
     `SELECT id, email, username
      FROM users
      WHERE lower(email) = lower($1) OR lower(username) = lower($2)
      LIMIT 1`,
-    [payload.email, payload.username],
+    [email, username],
   );
 
   if (existing.rowCount > 0) {
     const row = existing.rows[0];
 
-    if (row.email.toLowerCase() === payload.email.toLowerCase()) {
+    if (row.email.toLowerCase() === email) {
       throw createHttpError(409, 'email_taken', 'Cet email est deja utilise.');
     }
 
-    if (row.username.toLowerCase() === payload.username.toLowerCase()) {
+    if (row.username.toLowerCase() === username) {
       throw createHttpError(409, 'username_taken', 'Ce nom utilisateur est deja utilise.');
     }
   }
 
-  const result = await query(
-    `INSERT INTO users (
-       username,
-       email,
-       display_name,
-       avatar_url,
-       bio,
-       password_hash,
-       role
-     )
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING *`,
-    [
-      payload.username,
-      payload.email,
-      payload.displayName,
-      payload.avatarUrl || null,
-      payload.bio || null,
-      hashPassword(payload.password),
-      getRoleForEmail(payload.email),
-    ],
-  );
-  const user = toPublicUser(result.rows[0]);
+  const verificationCode = String(crypto.randomInt(100000, 999999));
+  const user = await transaction(async (client) => {
+    const result = await client.query(
+      `INSERT INTO users (
+         username,
+         email,
+         display_name,
+         avatar_url,
+         bio,
+         password_hash,
+         role
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [
+        username,
+        email,
+        payload.displayName,
+        payload.avatarUrl || null,
+        payload.bio || null,
+        hashPassword(payload.password),
+        getRoleForEmail(email),
+      ],
+    );
+    const createdUser = toPublicUser(result.rows[0]);
+
+    await client.query(
+      `INSERT INTO user_gifts (user_id, gift_number, stock)
+       VALUES ($1, 15, 1)
+       ON CONFLICT DO NOTHING`,
+      [createdUser.id],
+    );
+
+    await client.query(
+      `INSERT INTO email_verification_codes (user_id, code_hash, expires_at)
+       VALUES ($1, $2, now() + interval '15 minutes')`,
+      [createdUser.id, hashVerificationCode(verificationCode)],
+    );
+
+    return createdUser;
+  });
+
+  await mailService.sendMail({
+    to: user.email,
+    subject: 'Ton code TRUEFEED',
+    text: `Ton code de verification TRUEFEED est ${verificationCode}. Il expire dans 15 minutes.`,
+  });
 
   return {
     user,
     session: await createSession(user),
+    emailVerificationRequired: true,
   };
+}
+
+async function verifyEmail({ email, code }) {
+  const result = await query(
+    `SELECT users.id, email_verification_codes.id AS code_id, email_verification_codes.code_hash
+     FROM users
+     INNER JOIN email_verification_codes ON email_verification_codes.user_id = users.id
+     WHERE lower(users.email) = lower($1)
+       AND email_verification_codes.used_at IS NULL
+       AND email_verification_codes.expires_at > now()
+     ORDER BY email_verification_codes.created_at DESC
+     LIMIT 1`,
+    [email],
+  );
+  const row = result.rows[0];
+
+  if (!row || row.code_hash !== hashVerificationCode(String(code || '').trim())) {
+    throw createHttpError(400, 'invalid_verification_code', 'Code de verification invalide.');
+  }
+
+  await transaction(async (client) => {
+    await client.query(`UPDATE email_verification_codes SET used_at = now() WHERE id = $1`, [
+      row.code_id,
+    ]);
+    await client.query(`UPDATE users SET email_verified_at = now(), updated_at = now() WHERE id = $1`, [
+      row.id,
+    ]);
+  });
+
+  return { verified: true };
 }
 
 async function login({ email, password }) {
@@ -315,6 +386,7 @@ const authService = {
   refresh,
   register,
   updateProfile,
+  verifyEmail,
 };
 
 module.exports = {

@@ -10,7 +10,13 @@ const env = {
     .map((origin) => origin.trim())
     .filter(Boolean),
   databaseUrl: process.env.DATABASE_URL,
+  resendApiKey: process.env.RESEND_API_KEY,
+  mailFrom: process.env.MAIL_FROM || 'TRUEFEED <onboarding@resend.dev>',
   trustProxy: process.env.TRUST_PROXY === 'true',
+  vercelProjectHostPatterns: [
+    /^truefeed(?:-[a-z0-9-]+)?\.vercel\.app$/i,
+    /^truefeed(?:-[a-z0-9-]+)?-suphileericka-dotcoms-projects\.vercel\.app$/i,
+  ],
 };
 
 function assertProductionEnv() {
@@ -29,10 +35,6 @@ function assertProductionEnv() {
     process.env.JWT_REFRESH_SECRET === 'change-me-refresh-secret'
   ) {
     missing.push('JWT_REFRESH_SECRET');
-  }
-
-  if (env.clientOrigins.includes('*')) {
-    missing.push('CLIENT_ORIGINS');
   }
 
   if (!env.databaseUrl) {

@@ -13,11 +13,33 @@ if (env.trustProxy) {
   app.set('trust proxy', 1);
 }
 
+function isAllowedOrigin(origin) {
+  if (!origin || env.clientOrigins.includes(origin)) {
+    return true;
+  }
+
+  if (env.clientOrigins.includes('*') && env.nodeEnv !== 'production') {
+    return true;
+  }
+
+  try {
+    const { hostname, protocol } = new URL(origin);
+
+    if (protocol !== 'https:' && env.nodeEnv !== 'development') {
+      return false;
+    }
+
+    return env.vercelProjectHostPatterns.some((pattern) => pattern.test(hostname));
+  } catch {
+    return false;
+  }
+}
+
 app.use(securityHeaders);
 app.use(
   cors({
     origin(origin, callback) {
-      if (env.clientOrigins.includes('*') || !origin || env.clientOrigins.includes(origin)) {
+      if (isAllowedOrigin(origin)) {
         callback(null, true);
         return;
       }

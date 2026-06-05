@@ -175,7 +175,6 @@ const FeedCard = memo(function FeedCard({
 export default function HomeScreen() {
   const { selectedSeason } = useGlobalSeason();
   const [sort, setSort] = useState<'recent' | 'popular'>('recent');
-  const [activeTag, setActiveTag] = useState('Tous');
   const [hasOwnStory, setHasOwnStory] = useState(false);
   const [showStoryComposer, setShowStoryComposer] = useState(false);
   const [storyText, setStoryText] = useState('');
@@ -183,10 +182,7 @@ export default function HomeScreen() {
   const [storyBackground, setStoryBackground] = useState(storyBackgrounds[0]);
   const theme = seasonThemes[selectedSeason];
   const feed = feedBySeason[selectedSeason];
-  const tagOptions = ['Tous', 'BonPlan', 'VlogFeed', 'TrueDebate'];
-  const filteredPosts = feedPosts
-    .filter((post) => activeTag === 'Tous' || post.tag === activeTag)
-    .sort((a, b) => (sort === 'popular' ? b.likes - a.likes : 0));
+  const filteredPosts = [...feedPosts].sort((a, b) => (sort === 'popular' ? b.likes - a.likes : 0));
 
   async function pickStoryMedia() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -255,18 +251,6 @@ export default function HomeScreen() {
                 textColor={sort === 'popular' ? '#FFFFFF' : theme.muted}
                 onPress={() => setSort('popular')}
               />
-            </View>
-            <View style={styles.filterRow}>
-              {tagOptions.map((tag) => (
-                <Chip
-                  key={tag}
-                  label={tag}
-                  active={activeTag === tag}
-                  backgroundColor={activeTag === tag ? theme.accentSoft : theme.surface}
-                  textColor={activeTag === tag ? theme.accentStrong : theme.muted}
-                  onPress={() => setActiveTag(tag)}
-                />
-              ))}
             </View>
             <ScrollView
               horizontal

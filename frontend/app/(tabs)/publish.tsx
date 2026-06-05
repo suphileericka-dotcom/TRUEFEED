@@ -2,14 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
   BrandHeader,
   Chip,
   MediaSelector,
   ScreenShell,
-  SeasonalTag,
   SectionLabel,
   TruefeedModal,
 } from '@/components/truefeed/ui';
@@ -18,42 +17,30 @@ import {
   postFormats,
   publishMediaOptions,
   seasonThemes,
-  seasonalTags,
-  visibilityOptions,
 } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 import { useSession } from '@/hooks/use-session';
+import { goodTipsApi } from '@/services/api/good-tips';
+import { postsApi } from '@/services/api/posts';
 
 type FormatKey = 'photo' | 'vlog' | 'debate' | 'tip';
 type MediaKey = (typeof publishMediaOptions)[number]['key'];
-type PublishState = 'idle' | 'draft' | 'published';
 
 export default function PublishScreen() {
   const { selectedSeason } = useGlobalSeason();
-  const { isAuthenticated } = useSession();
+  const { isAuthenticated, session } = useSession();
   const [format, setFormat] = useState<FormatKey>('vlog');
   const [mediaType, setMediaType] = useState<MediaKey>('video');
-  const [visibility, setVisibility] = useState('Public');
-  const [title, setTitle] = useState('Matin calme a Kyoto');
-  const [location, setLocation] = useState('Kyoto, Japon');
-  const [caption, setCaption] = useState(
-    'Spot prefere du moment, lumiere parfaite et petite astuce budget a partager avec la commu.',
-  );
-  const [selectedTags, setSelectedTags] = useState<string[]>(['ville', 'food']);
+  const [title, setTitle] = useState('');
+  const [location, setLocation] = useState('');
+  const [caption, setCaption] = useState('');
+  const selectedTags = ['ville', 'food'];
   const [selectedMediaUri, setSelectedMediaUri] = useState<string | null>(null);
-  const [publishState, setPublishState] = useState<PublishState>('idle');
   const [showPublishModal, setShowPublishModal] = useState(false);
 
   const theme = seasonThemes[selectedSeason];
-  const tags = seasonalTags[selectedSeason];
   const activeFormat = postFormats.find((item) => item.key === format);
   const activeMedia = publishMediaOptions.find((item) => item.key === mediaType);
-
-  function toggleTag(tag: string) {
-    setSelectedTags((current) =>
-      current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag],
-    );
-  }
 
   async function pickMedia(nextMediaType = mediaType) {
     if (nextMediaType === 'text') {
@@ -65,7 +52,6 @@ export default function PublishScreen() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      setPublishState('idle');
       return;
     }
 
@@ -86,29 +72,45 @@ export default function PublishScreen() {
     }
   }
 
-  async function shareDraft() {
-    await Share.share({
-      title,
-      message: `${title}\n${location}\n\n${caption}`,
-    }).catch(() => undefined);
-  }
-
-  function publishPost() {
+  async function publishPost() {
     if (!isAuthenticated) {
       setShowPublishModal(false);
       router.push('/login');
       return;
     }
 
-    setPublishState('published');
-    setShowPublishModal(false);
+    try {
+      if (format === 'tip') {
+        await goodTipsApi.create({
+          place: location.trim() || title.trim() || caption.trim().slice(0, 80),
+          budget: 'A preciser',
+          transport: 'A preciser',
+        });
+        setShowPublishModal(false);
+        router.push('/bonplan');
+        return;
+      }
 
-    if (format === 'debate' || mediaType === 'text') {
-      router.push('/debate');
-      return;
+      if (session?.accessToken) {
+        await postsApi.create(
+          {
+            title: title.trim() || undefined,
+            caption: caption.trim(),
+            mediaType,
+            format,
+            location: location.trim() || undefined,
+            season: selectedSeason,
+            tags: selectedTags,
+          },
+          session.accessToken,
+        );
+      }
+
+      setShowPublishModal(false);
+      router.push(format === 'debate' || mediaType === 'text' ? '/debate' : '/(tabs)');
+    } catch {
+      setShowPublishModal(false);
     }
-
-    router.push('/(tabs)');
   }
 
   return (
@@ -168,13 +170,10 @@ export default function PublishScreen() {
         })}
       </View>
 
-      <View
-        style={[styles.formCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
-      >
-        <Text style={[styles.label, { color: theme.text }]}>Titre</Text>
+      <View style={[styles.formCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <TextInput
           onChangeText={setTitle}
-          placeholder="Donne un titre court au post"
+          placeholder="Sujet court"
           placeholderTextColor={theme.muted}
           style={[
             styles.singleInput,
@@ -187,10 +186,9 @@ export default function PublishScreen() {
           value={title}
         />
 
-        <Text style={[styles.label, { color: theme.text }]}>Destination</Text>
         <TextInput
           onChangeText={setLocation}
-          placeholder="Ville, pays ou spot"
+          placeholder={format === 'tip' ? 'Lieu du bon plan' : 'Lieu'}
           placeholderTextColor={theme.muted}
           style={[
             styles.singleInput,
@@ -203,11 +201,10 @@ export default function PublishScreen() {
           value={location}
         />
 
-        <Text style={[styles.label, { color: theme.text }]}>Legende</Text>
         <TextInput
           multiline
           onChangeText={setCaption}
-          placeholder="Raconte le moment, le bon plan ou le debat..."
+          placeholder="Texte"
           placeholderTextColor={theme.muted}
           style={[
             styles.captionInput,
@@ -220,42 +217,12 @@ export default function PublishScreen() {
           textAlignVertical="top"
           value={caption}
         />
-
-        <Text style={[styles.label, { color: theme.text }]}>Tags saisonniers</Text>
-        <View style={styles.tagRow}>
-          {tags.map((tag) => {
-            const isActive = selectedTags.includes(tag);
-            return (
-              <SeasonalTag
-                key={tag}
-                label={tag}
-                theme={theme}
-                active={isActive}
-                onPress={() => toggleTag(tag)}
-              />
-            );
-          })}
-        </View>
-
-        <Text style={[styles.label, { color: theme.text }]}>Visibilite</Text>
-        <View style={styles.visibilityRow}>
-          {visibilityOptions.map((option) => (
-            <Chip
-              key={option}
-              label={option}
-              active={visibility === option}
-              backgroundColor={visibility === option ? theme.accentSoft : theme.surfaceAlt}
-              textColor={visibility === option ? theme.accentStrong : theme.muted}
-              onPress={() => setVisibility(option)}
-            />
-          ))}
-        </View>
       </View>
 
       <View style={[styles.previewCard, { backgroundColor: theme.accentStrong }]}>
         <View style={styles.previewHeader}>
           <Text style={styles.previewLabel}>Apercu</Text>
-          <Chip label={visibility} backgroundColor="rgba(255,255,255,0.2)" textColor="#FFFFFF" />
+          <Chip label={activeFormat?.label ?? 'Post'} backgroundColor="rgba(255,255,255,0.2)" textColor="#FFFFFF" />
         </View>
         <Text style={styles.previewTitle}>{title}</Text>
         <Text style={styles.previewMeta}>
@@ -273,44 +240,14 @@ export default function PublishScreen() {
 
       <View style={styles.actions}>
         <Pressable
-          onPress={shareDraft}
+          onPress={() => setShowPublishModal(true)}
           style={[
-            styles.secondaryButton,
-            { borderColor: theme.border, backgroundColor: theme.surface },
+            styles.primaryButton,
+            { backgroundColor: selectedSeason === 'winter' ? '#FFFFFF' : theme.text },
           ]}
         >
-          <Text style={[styles.secondaryButtonText, { color: theme.text }]}>Partager</Text>
+          <Text style={[styles.primaryButtonText, { color: selectedSeason === 'winter' ? '#0F172A' : '#FFFFFF' }]}>Publier</Text>
         </Pressable>
-        <Pressable
-          onPress={() => setShowPublishModal(true)}
-          style={[styles.primaryButton, { backgroundColor: theme.text }]}
-        >
-          <Text style={styles.primaryButtonText}>Publier</Text>
-        </Pressable>
-      </View>
-
-      <View
-        style={[
-          styles.statusCard,
-          { backgroundColor: theme.surfaceAlt, borderColor: theme.border },
-        ]}
-      >
-        <Text style={[styles.statusTitle, { color: theme.text }]}>
-          {publishState === 'idle'
-            ? 'Pret a publier'
-            : publishState === 'draft'
-              ? 'Brouillon enregistre'
-              : 'Publication prete'}
-        </Text>
-        <Text style={[styles.statusText, { color: theme.muted }]}>
-          {publishState === 'idle'
-            ? 'Texte ou debat ira dans Debat. Photo et video iront dans l accueil.'
-            : publishState === 'draft'
-              ? 'Ton contenu est garde de cote pour etre repris plus tard.'
-              : format === 'debate' || mediaType === 'text'
-                ? 'Ton debat peut maintenant apparaitre dans Debat.'
-                : 'Ton post peut maintenant apparaitre dans l accueil.'}
-        </Text>
       </View>
 
       <TruefeedModal
