@@ -4,54 +4,71 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import {
-  BrandHeader,
-  Chip,
-  MediaSelector,
-  ScreenShell,
-  SectionLabel,
-  TruefeedModal,
-} from '@/components/truefeed/ui';
-import {
-  fonts,
-  postFormats,
-  publishMediaOptions,
-  seasonThemes,
-} from '@/constants/truefeed';
+import { BrandHeader, MediaSelector, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
+import { fonts, publishMediaOptions, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 import { useSession } from '@/hooks/use-session';
 import { goodTipsApi } from '@/services/api/good-tips';
 import { postsApi } from '@/services/api/posts';
 
-type FormatKey = 'photo' | 'vlog' | 'debate' | 'tip';
 type MediaKey = (typeof publishMediaOptions)[number]['key'];
+type PublishMode = 'normal' | 'text' | 'media' | 'tip';
+
+const maxTextLength = 2200;
 
 export default function PublishScreen() {
   const { selectedSeason } = useGlobalSeason();
   const { isAuthenticated, session } = useSession();
-  const [format, setFormat] = useState<FormatKey>('vlog');
-  const [mediaType, setMediaType] = useState<MediaKey>('video');
-  const [title, setTitle] = useState('');
-  const [location, setLocation] = useState('');
-  const [caption, setCaption] = useState('');
-  const selectedTags = ['ville', 'food'];
-  const [selectedMediaUri, setSelectedMediaUri] = useState<string | null>(null);
-  const [showPublishModal, setShowPublishModal] = useState(false);
-
   const theme = seasonThemes[selectedSeason];
-  const activeFormat = postFormats.find((item) => item.key === format);
-  const activeMedia = publishMediaOptions.find((item) => item.key === mediaType);
+  const [mode, setMode] = useState<PublishMode>('normal');
+  const [mediaType, setMediaType] = useState<MediaKey>('image');
+  const [selectedMediaUri, setSelectedMediaUri] = useState<string | null>(null);
+  const [caption, setCaption] = useState('');
+  const [place, setPlace] = useState('');
+  const [budget, setBudget] = useState('');
+  const [transport, setTransport] = useState('');
+  const [status, setStatus] = useState('');
 
-  async function pickMedia(nextMediaType = mediaType) {
+  const activeMedia = publishMediaOptions.find((item) => item.key === mediaType);
+  const canPublishText = caption.trim().length >= 2;
+  const canPublishMedia = Boolean(selectedMediaUri);
+  const canPublishTip =
+    place.trim().length >= 2 && budget.trim().length >= 1 && transport.trim().length >= 2;
+
+  function requireAuth() {
+    if (isAuthenticated) {
+      return true;
+    }
+
+    router.push('/login');
+    return false;
+  }
+
+  function resetDraft() {
+    setMode('normal');
+    setMediaType('image');
+    setSelectedMediaUri(null);
+    setCaption('');
+    setPlace('');
+    setBudget('');
+    setTransport('');
+    setStatus('');
+  }
+
+  async function pickMedia(nextMediaType: MediaKey) {
     if (nextMediaType === 'text') {
-      setMediaType(nextMediaType);
+      setMode('text');
+      setMediaType('text');
       setSelectedMediaUri(null);
+      setCaption('');
+      setStatus('');
       return;
     }
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
+      setStatus('Autorise la galerie pour choisir un media.');
       return;
     }
 
@@ -65,66 +82,182 @@ export default function PublishScreen() {
       videoMaxDuration: 90,
     });
 
-    setMediaType(nextMediaType);
-
     if (!result.canceled && result.assets[0]) {
+      setMediaType(nextMediaType);
       setSelectedMediaUri(result.assets[0].uri);
+      setMode('media');
+      setCaption('');
+      setStatus('');
     }
   }
 
-  async function publishPost() {
-    if (!isAuthenticated) {
-      setShowPublishModal(false);
-      router.push('/login');
+  async function publishText() {
+    if (!canPublishText || !requireAuth()) {
       return;
     }
 
     try {
-      if (format === 'tip') {
-        await goodTipsApi.create({
-          place: location.trim() || title.trim() || caption.trim().slice(0, 80),
-          budget: 'A preciser',
-          transport: 'A preciser',
-        });
-        setShowPublishModal(false);
-        router.push('/bonplan');
-        return;
-      }
-
-      if (session?.accessToken) {
-        await postsApi.create(
-          {
-            title: title.trim() || undefined,
-            caption: caption.trim(),
-            mediaType,
-            format,
-            location: location.trim() || undefined,
-            season: selectedSeason,
-            tags: selectedTags,
-          },
-          session.accessToken,
-        );
-      }
-
-      setShowPublishModal(false);
-      router.push(format === 'debate' || mediaType === 'text' ? '/debate' : '/(tabs)');
+      await postsApi.create(
+        {
+          caption: caption.trim(),
+          mediaType: 'text',
+          format: 'debate',
+          season: selectedSeason,
+          tags: [],
+        },
+        session?.accessToken || '',
+      );
+      resetDraft();
+      router.push('/debate');
     } catch {
-      setShowPublishModal(false);
+      setStatus('Impossible de publier ce texte pour le moment.');
     }
+  }
+
+  async function publishMedia() {
+    if (!canPublishMedia || !requireAuth()) {
+      return;
+    }
+
+    try {
+      await postsApi.create(
+        {
+          caption: caption.trim() || 'Publication media',
+          mediaType: mediaType === 'video' ? 'video' : 'image',
+          mediaUrl: 'https://truefeed-production.up.railway.app/media-placeholder',
+          format: mediaType === 'video' ? 'vlog' : 'photo',
+          season: selectedSeason,
+          tags: [],
+        },
+        session?.accessToken || '',
+      );
+      resetDraft();
+      router.push('/(tabs)');
+    } catch {
+      setStatus('Media selectionne. Envoi au feed indisponible pour le moment.');
+    }
+  }
+
+  async function publishTip() {
+    if (!canPublishTip || !requireAuth()) {
+      return;
+    }
+
+    try {
+      await goodTipsApi.create({
+        place: place.trim(),
+        budget: budget.trim(),
+        transport: transport.trim(),
+      });
+      resetDraft();
+      router.push('/bonplan');
+    } catch {
+      setStatus('Impossible de publier ce bon plan pour le moment.');
+    }
+  }
+
+  if (mode === 'text') {
+    return (
+      <ScreenShell theme={theme} contentContainerStyle={styles.fullContent}>
+        <View style={[styles.expandedMediaPanel, { backgroundColor: theme.accentStrong }]}>
+          <View style={styles.expandedTopRow}>
+            <Pressable onPress={resetDraft} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+            </Pressable>
+            <Pressable
+              onPress={publishText}
+              style={[styles.expandedPublishButton, { opacity: canPublishText ? 1 : 0.48 }]}
+            >
+              <Text style={styles.expandedPublishText}>Publier</Text>
+            </Pressable>
+          </View>
+          <TextInput
+            autoFocus
+            multiline
+            maxLength={maxTextLength}
+            onChangeText={setCaption}
+            placeholder="Ecris ton texte..."
+            placeholderTextColor="rgba(255,255,255,0.72)"
+            style={styles.expandedTextInput}
+            textAlignVertical="top"
+            value={caption}
+          />
+          <View style={styles.expandedBottomRow}>
+            <Pressable onPress={resetDraft} style={styles.deleteButton}>
+              <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.deleteText}>Supprimer</Text>
+            </Pressable>
+            <Text style={styles.counterText}>
+              {caption.length}/{maxTextLength}
+            </Text>
+          </View>
+          {status ? <Text style={styles.expandedStatus}>{status}</Text> : null}
+        </View>
+      </ScreenShell>
+    );
+  }
+
+  if (mode === 'media') {
+    return (
+      <ScreenShell theme={theme}>
+        <View style={styles.topRow}>
+          <Pressable onPress={resetDraft} style={[styles.iconButton, { backgroundColor: theme.surfaceAlt }]}>
+            <Ionicons name="arrow-back" size={20} color={theme.text} />
+          </Pressable>
+          <SectionLabel theme={theme} label={mediaType === 'video' ? 'Video' : 'Image'} />
+        </View>
+
+        <View style={[styles.mediaPanel, { backgroundColor: theme.accentStrong, borderColor: theme.border }]}>
+          <View style={styles.mediaTopRow}>
+            <View>
+              <Text style={styles.mediaKicker}>Media</Text>
+              <Text style={styles.mediaTitle}>{activeMedia?.label ?? 'Media'} selectionne</Text>
+            </View>
+            <View style={styles.mediaIconBubble}>
+              <Ionicons name={activeMedia?.icon ?? 'image-outline'} size={24} color="#FFFFFF" />
+            </View>
+          </View>
+          <View style={styles.mediaPreview}>
+            <Ionicons name={activeMedia?.icon ?? 'image-outline'} size={58} color="#FFFFFF" />
+            <Text style={styles.mediaPreviewText}>Media pret a publier</Text>
+          </View>
+        </View>
+
+        <TextInput
+          multiline
+          onChangeText={setCaption}
+          placeholder="Description optionnelle"
+          placeholderTextColor={theme.muted}
+          style={[
+            styles.captionInput,
+            { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
+          ]}
+          textAlignVertical="top"
+          value={caption}
+        />
+
+        <Pressable
+          onPress={publishMedia}
+          style={[
+            styles.primaryButton,
+            { backgroundColor: selectedSeason === 'winter' ? '#FFFFFF' : theme.text },
+          ]}
+        >
+          <Text style={[styles.primaryButtonText, { color: selectedSeason === 'winter' ? '#0F172A' : '#FFFFFF' }]}>
+            Publier
+          </Text>
+        </Pressable>
+        {status ? <Text style={[styles.statusText, { color: theme.muted }]}>{status}</Text> : null}
+      </ScreenShell>
+    );
   }
 
   return (
     <ScreenShell theme={theme}>
       <BrandHeader theme={theme} badgeText="Composer un post" badgeIcon="+" />
-
       <SectionLabel theme={theme} label="Page publication" />
 
-      <View
-        style={[
-          styles.mediaPanel,
-          { backgroundColor: theme.accentStrong, borderColor: theme.border },
-        ]}
-      >
+      <View style={[styles.mediaPanel, { backgroundColor: theme.accentStrong, borderColor: theme.border }]}>
         <View style={styles.mediaTopRow}>
           <View>
             <Text style={styles.mediaKicker}>Media</Text>
@@ -137,138 +270,89 @@ export default function PublishScreen() {
 
         <View style={styles.mediaPreview}>
           <Ionicons name={activeMedia?.icon ?? 'image-outline'} size={58} color="#FFFFFF" />
-          <Text style={styles.mediaPreviewText}>
-            {mediaType === 'text'
-              ? 'Post texte enrichi'
-              : selectedMediaUri
-                ? 'Media selectionne'
-                : 'Choisis une photo ou une video'}
-          </Text>
+          <Text style={styles.mediaPreviewText}>Choisis une photo, une video ou un texte</Text>
         </View>
 
         <MediaSelector
           options={publishMediaOptions}
           selectedKey={mediaType}
           theme={theme}
-          onSelect={(key) => pickMedia(key)}
+          onSelect={pickMedia}
         />
       </View>
 
-      <View style={styles.formatRow}>
-        {postFormats.map((item) => {
-          const isActive = format === item.key;
-          return (
-            <Chip
-              key={item.key}
-              label={item.label}
-              active={isActive}
-              backgroundColor={isActive ? theme.accentStrong : theme.surface}
-              textColor={isActive ? '#FFFFFF' : theme.muted}
-              onPress={() => setFormat(item.key as FormatKey)}
-            />
-          );
-        })}
-      </View>
-
-      <View style={[styles.formCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <TextInput
-          onChangeText={setTitle}
-          placeholder="Sujet court"
-          placeholderTextColor={theme.muted}
-          style={[
-            styles.singleInput,
-            {
-              backgroundColor: theme.surfaceAlt,
-              color: theme.text,
-              borderColor: theme.border,
-            },
-          ]}
-          value={title}
-        />
-
-        <TextInput
-          onChangeText={setLocation}
-          placeholder={format === 'tip' ? 'Lieu du bon plan' : 'Lieu'}
-          placeholderTextColor={theme.muted}
-          style={[
-            styles.singleInput,
-            {
-              backgroundColor: theme.surfaceAlt,
-              color: theme.text,
-              borderColor: theme.border,
-            },
-          ]}
-          value={location}
-        />
-
-        <TextInput
-          multiline
-          onChangeText={setCaption}
-          placeholder="Texte"
-          placeholderTextColor={theme.muted}
-          style={[
-            styles.captionInput,
-            {
-              backgroundColor: theme.surfaceAlt,
-              color: theme.text,
-              borderColor: theme.border,
-            },
-          ]}
-          textAlignVertical="top"
-          value={caption}
-        />
-      </View>
-
-      <View style={[styles.previewCard, { backgroundColor: theme.accentStrong }]}>
-        <View style={styles.previewHeader}>
-          <Text style={styles.previewLabel}>Apercu</Text>
-          <Chip label={activeFormat?.label ?? 'Post'} backgroundColor="rgba(255,255,255,0.2)" textColor="#FFFFFF" />
+      <Pressable
+        onPress={() => {
+          setMode('tip');
+          setStatus('');
+        }}
+        style={[
+          styles.tipShortcut,
+          { backgroundColor: theme.surface, borderColor: selectedSeason === 'winter' ? theme.border : '#E7D8C3' },
+        ]}
+      >
+        <View style={styles.tipIconBox}>
+          <Ionicons name="location-outline" size={34} color="#49B761" />
         </View>
-        <Text style={styles.previewTitle}>{title}</Text>
-        <Text style={styles.previewMeta}>
-          {activeFormat?.label ?? 'Post'} - {theme.label} - {location}
-        </Text>
-        <Text style={styles.previewText}>{caption}</Text>
-        <View style={styles.previewTags}>
-          {selectedTags.map((tag) => (
-            <Text key={tag} style={styles.previewTag}>
-              #{tag}
-            </Text>
-          ))}
+        <View style={styles.tipShortcutCopy}>
+          <Text style={[styles.tipShortcutTitle, { color: theme.text }]}>Bon plan -&gt; Bon Plan</Text>
+          <Text style={[styles.tipShortcutSubtitle, { color: theme.muted }]}>Lieu + budget + transport</Text>
         </View>
-      </View>
+        <Ionicons name="chevron-forward" size={28} color={theme.muted} />
+      </Pressable>
 
-      <View style={styles.actions}>
-        <Pressable
-          onPress={() => setShowPublishModal(true)}
-          style={[
-            styles.primaryButton,
-            { backgroundColor: selectedSeason === 'winter' ? '#FFFFFF' : theme.text },
-          ]}
-        >
-          <Text style={[styles.primaryButtonText, { color: selectedSeason === 'winter' ? '#0F172A' : '#FFFFFF' }]}>Publier</Text>
-        </Pressable>
-      </View>
+      {mode === 'tip' ? (
+        <View style={[styles.tipForm, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <TextInput
+            onChangeText={setPlace}
+            placeholder="Lieu"
+            placeholderTextColor={theme.muted}
+            style={[styles.singleInput, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
+            value={place}
+          />
+          <TextInput
+            onChangeText={setBudget}
+            placeholder="Budget"
+            placeholderTextColor={theme.muted}
+            style={[styles.singleInput, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
+            value={budget}
+          />
+          <TextInput
+            onChangeText={setTransport}
+            placeholder="Transport"
+            placeholderTextColor={theme.muted}
+            style={[styles.singleInput, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
+            value={transport}
+          />
+          <View style={styles.tipActions}>
+            <Pressable onPress={resetDraft} style={[styles.secondaryButton, { borderColor: theme.border }]}>
+              <Text style={[styles.secondaryButtonText, { color: theme.text }]}>Retour</Text>
+            </Pressable>
+            <Pressable
+              onPress={publishTip}
+              style={[styles.primaryButton, { backgroundColor: theme.text, opacity: canPublishTip ? 1 : 0.5 }]}
+            >
+              <Text style={styles.primaryButtonText}>Publier</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
 
-      <TruefeedModal
-        visible={showPublishModal}
-        theme={theme}
-        title="Publier ce post ?"
-        message={
-          format === 'debate' || mediaType === 'text'
-            ? 'Ce contenu sera publie dans Debat.'
-            : 'Ce contenu sera publie dans l accueil.'
-        }
-        secondaryLabel="Annuler"
-        primaryLabel="Publier"
-        onClose={() => setShowPublishModal(false)}
-        onPrimary={publishPost}
-      />
+      {status ? <Text style={[styles.statusText, { color: theme.muted }]}>{status}</Text> : null}
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
+  fullContent: { flexGrow: 1 },
+  topRow: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  iconButton: {
+    alignItems: 'center',
+    borderRadius: 18,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
   mediaPanel: {
     borderRadius: 28,
     borderWidth: 1,
@@ -306,8 +390,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
     borderRadius: 22,
     gap: 10,
-    minHeight: 170,
     justifyContent: 'center',
+    minHeight: 170,
   },
   mediaPreviewText: {
     color: '#FFFFFF',
@@ -315,43 +399,27 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
-  formatRow: {
+  tipShortcut: {
+    alignItems: 'center',
+    borderRadius: 24,
+    borderWidth: 1,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  formCard: {
-    borderRadius: 28,
-    borderWidth: 1,
     gap: 16,
-    padding: 20,
+    padding: 18,
   },
-  label: {
-    fontFamily: fonts.body,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  singleInput: {
-    borderRadius: 18,
-    borderWidth: 1,
-    fontFamily: fonts.body,
-    fontSize: 16,
-    padding: 15,
-  },
-  inlineBlock: {
+  tipIconBox: {
+    alignItems: 'center',
+    backgroundColor: '#E3F3E7',
     borderRadius: 20,
-    gap: 6,
-    padding: 16,
+    height: 72,
+    justifyContent: 'center',
+    width: 72,
   },
-  inlineMain: {
-    fontFamily: fonts.body,
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  inlineMeta: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-  },
+  tipShortcutCopy: { flex: 1, gap: 5 },
+  tipShortcutTitle: { fontFamily: fonts.body, fontSize: 28, fontWeight: '900' },
+  tipShortcutSubtitle: { fontFamily: fonts.body, fontSize: 24, fontWeight: '700' },
+  tipForm: { borderRadius: 24, borderWidth: 1, gap: 12, padding: 16 },
+  singleInput: { borderRadius: 18, fontFamily: fonts.body, fontSize: 16, padding: 15 },
   captionInput: {
     borderRadius: 20,
     borderWidth: 1,
@@ -361,68 +429,7 @@ const styles = StyleSheet.create({
     minHeight: 130,
     padding: 16,
   },
-  tagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  visibilityRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  previewCard: {
-    borderRadius: 28,
-    gap: 10,
-    padding: 22,
-  },
-  previewHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  previewLabel: {
-    color: '#EFD9CD',
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-  },
-  previewTitle: {
-    color: '#FFFFFF',
-    fontFamily: fonts.title,
-    fontSize: 30,
-    fontWeight: '700',
-  },
-  previewText: {
-    color: '#FFF1EA',
-    fontFamily: fonts.body,
-    fontSize: 16,
-    lineHeight: 26,
-  },
-  previewMeta: {
-    color: '#FFE8DC',
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  previewTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    paddingTop: 4,
-  },
-  previewTag: {
-    color: '#FFFFFF',
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
+  tipActions: { flexDirection: 'row', gap: 12 },
   secondaryButton: {
     alignItems: 'center',
     borderRadius: 18,
@@ -430,11 +437,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 16,
   },
-  secondaryButtonText: {
-    fontFamily: fonts.body,
-    fontSize: 15,
-    fontWeight: '800',
-  },
+  secondaryButtonText: { fontFamily: fonts.body, fontSize: 15, fontWeight: '800' },
   primaryButton: {
     alignItems: 'center',
     borderRadius: 18,
@@ -447,20 +450,76 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
-  statusCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    gap: 8,
+  statusText: { fontFamily: fonts.body, fontSize: 14, fontWeight: '800', textAlign: 'center' },
+  expandedMediaPanel: {
+    borderRadius: 28,
+    flex: 1,
+    gap: 18,
+    minHeight: 650,
     padding: 18,
   },
-  statusTitle: {
-    fontFamily: fonts.body,
-    fontSize: 18,
-    fontWeight: '800',
+  expandedTopRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  statusText: {
+  backButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 18,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  expandedPublishButton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  expandedPublishText: {
+    color: '#2B241B',
     fontFamily: fonts.body,
     fontSize: 14,
-    lineHeight: 22,
+    fontWeight: '900',
+  },
+  expandedTextInput: {
+    color: '#FFFFFF',
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: 24,
+    fontWeight: '800',
+    lineHeight: 34,
+    paddingVertical: 12,
+  },
+  expandedBottomRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  deleteButton: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 8,
+  },
+  deleteText: {
+    color: '#FFFFFF',
+    fontFamily: fonts.body,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  counterText: {
+    color: '#FFFFFF',
+    fontFamily: fonts.body,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  expandedStatus: {
+    color: '#FFFFFF',
+    fontFamily: fonts.body,
+    fontSize: 14,
+    fontWeight: '900',
+    textAlign: 'center',
   },
 });
