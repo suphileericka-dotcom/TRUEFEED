@@ -1,17 +1,28 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { BrandHeader, Chip, ScreenShell } from '@/components/truefeed/ui';
+import { BrandHeader, Chip, ScreenShell, TruefeedModal } from '@/components/truefeed/ui';
 import { debateTopics, fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { useSession } from '@/hooks/use-session';
 
 type DebateFilter = 'popular' | 'recent' | 'mine';
 type VoteValue = 'for' | 'against';
+type ReplyItem = {
+  id: string;
+  author: string;
+  age: string;
+  text: string;
+  up: number;
+  down: number;
+  comments: number;
+};
 
-const seedReplies = [
+const seedReplies: ReplyItem[] = [
   {
+    id: 'reply-vaadhum',
     author: 'vaadhum',
     age: '12 h',
     text: "Je comprends l'idee, mais tout depend du contexte et de la facon de voyager.",
@@ -20,6 +31,7 @@ const seedReplies = [
     comments: 1,
   },
   {
+    id: 'reply-christine',
     author: 'christinecamarchepas',
     age: '15 h',
     text: "C'est justement le debat: liberte, confort, budget, chacun ne met pas le curseur au meme endroit.",
@@ -31,13 +43,18 @@ const seedReplies = [
 
 export default function DebateScreen() {
   const { selectedSeason } = useGlobalSeason();
+  const { isAuthenticated, user } = useSession();
   const theme = seasonThemes[selectedSeason];
   const [selectedTopic, setSelectedTopic] = useState<(typeof debateTopics)[number] | null>(null);
   const [reply, setReply] = useState('');
   const [filter, setFilter] = useState<DebateFilter>('popular');
   const [votes, setVotes] = useState<Record<string, VoteValue>>({});
   const [reposts, setReposts] = useState<Record<string, boolean>>({});
-  const [replies, setReplies] = useState<Record<string, string[]>>({});
+  const [replies, setReplies] = useState<Record<string, ReplyItem[]>>({});
+  const [replyVotes, setReplyVotes] = useState<Record<string, VoteValue>>({});
+  const [replyReposts, setReplyReposts] = useState<Record<string, boolean>>({});
+  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
+  const [showAuthNotice, setShowAuthNotice] = useState(false);
 
   const visibleTopics = useMemo(() => {
     if (filter === 'mine') {
@@ -51,19 +68,29 @@ export default function DebateScreen() {
     return [...debateTopics].sort((a, b) => b.percent - a.percent);
   }, [filter, votes]);
 
+  function requireAccount() {
+    if (isAuthenticated) {
+      return true;
+    }
+
+    setShowAuthNotice(true);
+    return false;
+  }
+
   function vote(topicId: string, value: VoteValue) {
+    if (!requireAccount()) {
+      return;
+    }
+
     setVotes((current) => ({ ...current, [topicId]: value }));
   }
 
   function repost(topicId: string) {
-    setReposts((current) => ({ ...current, [topicId]: !current[topicId] }));
-  }
+    if (!requireAccount()) {
+      return;
+    }
 
-  function shareTopic(topic: (typeof debateTopics)[number]) {
-    Share.share({
-      title: topic.title,
-      message: `${topic.title}\n\n${topic.excerpt}`,
-    }).catch(() => undefined);
+    setReposts((current) => ({ ...current, [topicId]: !current[topicId] }));
   }
 
   function sendReply() {
@@ -73,11 +100,46 @@ export default function DebateScreen() {
       return;
     }
 
+    if (!requireAccount()) {
+      return;
+    }
+
     setReplies((current) => ({
       ...current,
-      [selectedTopic.id]: [cleanReply, ...(current[selectedTopic.id] ?? [])],
+      [selectedTopic.id]: [
+        {
+          id: `local-${Date.now()}`,
+          author: user?.username || 'toi',
+          age: 'maintenant',
+          text: cleanReply,
+          up: 0,
+          down: 0,
+          comments: 0,
+        },
+        ...(current[selectedTopic.id] ?? []),
+      ],
     }));
     setReply('');
+  }
+
+  function voteReply(replyId: string, value: VoteValue) {
+    if (!requireAccount()) {
+      return;
+    }
+
+    setReplyVotes((current) => ({ ...current, [replyId]: value }));
+  }
+
+  function repostReply(replyId: string) {
+    if (!requireAccount()) {
+      return;
+    }
+
+    setReplyReposts((current) => ({ ...current, [replyId]: !current[replyId] }));
+  }
+
+  function toggleReplyThread(replyId: string) {
+    setExpandedReplies((current) => ({ ...current, [replyId]: !current[replyId] }));
   }
 
   function getUpCount(topic: (typeof debateTopics)[number]) {
@@ -142,12 +204,79 @@ export default function DebateScreen() {
               />
               <Text style={[styles.actionText, { color: theme.muted }]}>{reposts[topic.id] ? 1 : 0}</Text>
             </Pressable>
-            <Pressable onPress={() => shareTopic(topic)} style={styles.actionButton}>
-              <Ionicons name="paper-plane-outline" size={24} color={theme.muted} />
-            </Pressable>
           </View>
         </View>
       </Pressable>
+    );
+  }
+
+  function renderReply(item: ReplyItem) {
+    const currentVote = replyVotes[item.id];
+    const isExpanded = Boolean(expandedReplies[item.id]);
+    const upCount = item.up + (currentVote === 'for' ? 1 : 0);
+    const downCount = item.down + (currentVote === 'against' ? 1 : 0);
+
+    return (
+      <View key={item.id} style={styles.replyPost}>
+        <View style={[styles.replyAvatar, { backgroundColor: theme.surfaceAlt }]}>
+          <Text style={[styles.replyAvatarText, { color: theme.muted }]}>
+            {item.author.charAt(0).toUpperCase()}
+          </Text>
+        </View>
+        <View style={styles.threadContent}>
+          <View style={styles.threadHeader}>
+            <Text style={[styles.author, { color: theme.text }]}>{item.author}</Text>
+            <Text style={[styles.age, { color: theme.muted }]}>{item.age}</Text>
+          </View>
+          <Text style={[styles.threadBody, { color: theme.text }]}>{item.text}</Text>
+          <View style={styles.actions}>
+            <Pressable onPress={() => voteReply(item.id, 'for')} style={styles.actionButton}>
+              <Ionicons
+                name={currentVote === 'for' ? 'thumbs-up' : 'thumbs-up-outline'}
+                size={22}
+                color={currentVote === 'for' ? theme.accentStrong : theme.muted}
+              />
+              <Text style={[styles.actionText, { color: theme.muted }]}>{upCount}</Text>
+            </Pressable>
+            <Pressable onPress={() => voteReply(item.id, 'against')} style={styles.actionButton}>
+              <Ionicons
+                name={currentVote === 'against' ? 'thumbs-down' : 'thumbs-down-outline'}
+                size={22}
+                color={currentVote === 'against' ? theme.accentStrong : theme.muted}
+              />
+              <Text style={[styles.actionText, { color: theme.muted }]}>{downCount}</Text>
+            </Pressable>
+            <Pressable onPress={() => toggleReplyThread(item.id)} style={styles.actionButton}>
+              <Ionicons name="chatbubble-outline" size={22} color={theme.muted} />
+              <Text style={[styles.actionText, { color: theme.muted }]}>{item.comments}</Text>
+            </Pressable>
+            <Pressable onPress={() => repostReply(item.id)} style={styles.actionButton}>
+              <Ionicons
+                name={replyReposts[item.id] ? 'repeat' : 'repeat-outline'}
+                size={22}
+                color={replyReposts[item.id] ? theme.accentStrong : theme.muted}
+              />
+            </Pressable>
+          </View>
+
+          {isExpanded ? (
+            <View style={[styles.replyThreadBox, { borderColor: theme.border }]}>
+              {item.comments > 0 ? (
+                <Text style={[styles.replyThreadText, { color: theme.muted }]}>
+                  {item.comments} reponse{item.comments > 1 ? 's' : ''} sur ce commentaire.
+                </Text>
+              ) : (
+                <Text style={[styles.replyThreadText, { color: theme.muted }]}>
+                  Aucune reponse pour le moment.
+                </Text>
+              )}
+              <Pressable onPress={() => toggleReplyThread(item.id)}>
+                <Text style={[styles.showLessText, { color: theme.accentStrong }]}>Voir moins</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+      </View>
     );
   }
 
@@ -173,50 +302,8 @@ export default function DebateScreen() {
           <Text style={[styles.detailFilter, { color: theme.text }]}>Populaire</Text>
         </View>
 
-        {localReplies.map((item, index) => (
-          <View key={`${item}-${index}`} style={styles.replyPost}>
-            <View style={[styles.replyAvatar, { backgroundColor: theme.surfaceAlt }]}>
-              <Text style={[styles.replyAvatarText, { color: theme.muted }]}>S</Text>
-            </View>
-            <View style={styles.threadContent}>
-              <Text style={[styles.author, { color: theme.text }]}>suphile</Text>
-              <Text style={[styles.threadBody, { color: theme.text }]}>{item}</Text>
-            </View>
-          </View>
-        ))}
-
-        {seedReplies.map((item) => (
-          <View key={item.author} style={styles.replyPost}>
-            <View style={[styles.replyAvatar, { backgroundColor: theme.surfaceAlt }]}>
-              <Text style={[styles.replyAvatarText, { color: theme.muted }]}>
-                {item.author.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <View style={styles.threadContent}>
-              <View style={styles.threadHeader}>
-                <Text style={[styles.author, { color: theme.text }]}>{item.author}</Text>
-                <Text style={[styles.age, { color: theme.muted }]}>{item.age}</Text>
-              </View>
-              <Text style={[styles.threadBody, { color: theme.text }]}>{item.text}</Text>
-              <View style={styles.actions}>
-                <View style={styles.actionButton}>
-                  <Ionicons name="thumbs-up-outline" size={22} color={theme.muted} />
-                  <Text style={[styles.actionText, { color: theme.muted }]}>{item.up}</Text>
-                </View>
-                <View style={styles.actionButton}>
-                  <Ionicons name="thumbs-down-outline" size={22} color={theme.muted} />
-                  <Text style={[styles.actionText, { color: theme.muted }]}>{item.down}</Text>
-                </View>
-                <View style={styles.actionButton}>
-                  <Ionicons name="chatbubble-outline" size={22} color={theme.muted} />
-                  <Text style={[styles.actionText, { color: theme.muted }]}>{item.comments}</Text>
-                </View>
-                <Ionicons name="repeat-outline" size={22} color={theme.muted} />
-                <Ionicons name="paper-plane-outline" size={22} color={theme.muted} />
-              </View>
-            </View>
-          </View>
-        ))}
+        {localReplies.map((item) => renderReply(item))}
+        {seedReplies.map((item) => renderReply(item))}
 
         <View style={[styles.composer, { backgroundColor: theme.surfaceAlt }]}>
           <TextInput
@@ -230,6 +317,24 @@ export default function DebateScreen() {
             <Ionicons name="send" size={23} color={theme.text} />
           </Pressable>
         </View>
+
+        <TruefeedModal
+          visible={showAuthNotice}
+          theme={theme}
+          title="Compte requis"
+          message="Cree un compte ou connecte-toi pour commenter, liker, republier et publier."
+          primaryLabel="Creer un compte"
+          secondaryLabel="Se connecter"
+          onClose={() => setShowAuthNotice(false)}
+          onPrimary={() => {
+            setShowAuthNotice(false);
+            router.push('/signup');
+          }}
+          onSecondary={() => {
+            setShowAuthNotice(false);
+            router.push('/login');
+          }}
+        />
       </ScreenShell>
     );
   }
@@ -279,6 +384,24 @@ export default function DebateScreen() {
           </Text>
         </View>
       )}
+
+      <TruefeedModal
+        visible={showAuthNotice}
+        theme={theme}
+        title="Compte requis"
+        message="Cree un compte ou connecte-toi pour commenter, liker, republier et publier."
+        primaryLabel="Creer un compte"
+        secondaryLabel="Se connecter"
+        onClose={() => setShowAuthNotice(false)}
+        onPrimary={() => {
+          setShowAuthNotice(false);
+          router.push('/signup');
+        }}
+        onSecondary={() => {
+          setShowAuthNotice(false);
+          router.push('/login');
+        }}
+      />
     </ScreenShell>
   );
 }
@@ -333,6 +456,9 @@ const styles = StyleSheet.create({
     width: 44,
   },
   replyAvatarText: { fontFamily: fonts.body, fontSize: 18, fontWeight: '900' },
+  replyThreadBox: { borderLeftWidth: 2, gap: 6, marginTop: 8, paddingLeft: 12 },
+  replyThreadText: { fontFamily: fonts.body, fontSize: 14, fontWeight: '800' },
+  showLessText: { fontFamily: fonts.body, fontSize: 14, fontWeight: '900' },
   composer: {
     alignItems: 'center',
     borderRadius: 999,
