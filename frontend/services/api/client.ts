@@ -12,6 +12,12 @@ type RequestOptions = RequestInit & {
   skipAuthRefresh?: boolean;
 };
 
+type ApiErrorPayload = {
+  error?: string;
+  message?: string;
+  details?: unknown;
+};
+
 export class ApiError extends Error {
   status: number;
   code?: string;
@@ -58,10 +64,10 @@ async function request<TResponse>(path: string, options: RequestOptions = {}): P
   }
 
   if (!response.ok) {
-    let payload: { error?: string; message?: string; details?: unknown } | null = null;
+    let payload: ApiErrorPayload | null = null;
 
     try {
-      payload = (await response.json()) as typeof payload;
+      payload = (await response.json()) as ApiErrorPayload;
     } catch {
       payload = null;
     }
