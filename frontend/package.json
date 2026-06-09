@@ -60,5 +60,8 @@
     "prettier": "^3.6.2",
     "typescript": "~5.9.2"
   },
+  "overrides": {
+    "shell-quote": "1.8.4"
+  },
   "private": true
 }
