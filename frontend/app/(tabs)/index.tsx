@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { memo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -16,6 +15,7 @@ import {
 import { BrandHeader, Chip, TruefeedModal } from '@/components/truefeed/ui';
 import { feedBySeason, fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { type FeedPost as ApiFeedPost, postsApi } from '@/services/api/posts';
 
 type FeedPost = {
   id: string;
@@ -24,12 +24,22 @@ type FeedPost = {
   title: string;
   caption: string;
   mediaType: 'image' | 'video' | 'text';
+  format: 'vlog' | 'photo' | 'tip' | 'debate';
   visual: string;
   tag: string;
   likes: number;
   comments: number;
   shares: number;
+  publishedAt: string;
 };
+
+type FeedItem = FeedPost & {
+  instanceId: string;
+};
+
+const FEED_BATCH_SIZE = 10;
+const PREFETCH_DISTANCE = 3;
+const REFRESH_INTERVAL_MS = 30 * 1000;
 
 const storyProfiles = [
   { name: 'Lucas', avatar: 'L', colors: ['#F9CE34', '#EE2A7B'] },
@@ -41,7 +51,7 @@ const storyProfiles = [
 
 const storyBackgrounds = ['#111827', '#EE2A7B', '#F97316', '#14B8A6', '#2563EB', '#7C3AED'];
 
-const feedPosts: FeedPost[] = [
+const fallbackPosts: FeedPost[] = [
   {
     id: 'kyoto-morning',
     author: 'nora.nomad',
@@ -49,11 +59,13 @@ const feedPosts: FeedPost[] = [
     title: 'Matin calme a Kyoto',
     caption: 'Fushimi Inari avant 7h: lumiere douce, budget zero, foule evitee.',
     mediaType: 'image',
-    visual: '⛩️',
+    format: 'photo',
+    visual: 'KYOTO',
     tag: 'BonPlan',
     likes: 1922,
     comments: 31,
     shares: 12,
+    publishedAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
   },
   {
     id: 'oia-sunset',
@@ -62,11 +74,13 @@ const feedPosts: FeedPost[] = [
     title: 'Oia sans courir',
     caption: 'Un spot cote ruelle avec vue caldeira et snack local a moins de 8 euros.',
     mediaType: 'video',
-    visual: '🏖️',
+    format: 'vlog',
+    visual: 'OIA',
     tag: 'VlogFeed',
     likes: 2847,
     comments: 42,
     shares: 18,
+    publishedAt: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
   },
   {
     id: 'hanami-debate',
@@ -75,19 +89,71 @@ const feedPosts: FeedPost[] = [
     title: 'Hanami: magie ou surcote ?',
     caption: 'Joli, oui. Mais est-ce devenu un passage trop touristique ? Debat ouvert.',
     mediaType: 'text',
-    visual: '🌸',
+    format: 'debate',
+    visual: 'DEBAT',
     tag: 'TrueDebate',
     likes: 1488,
     comments: 96,
     shares: 27,
+    publishedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
   },
 ];
+
+function scorePost(post: FeedPost) {
+  const ageHours = Math.max((Date.now() - new Date(post.publishedAt).getTime()) / 36e5, 1);
+  const freshBoost = ageHours <= 6 ? 80 : ageHours <= 24 ? 45 : ageHours <= 72 ? 20 : 0;
+
+  return (post.likes * 2 + post.comments * 3 + post.shares * 4 + freshBoost) / ageHours;
+}
+
+function makeFallbackBatch(startIndex: number, count: number): FeedItem[] {
+  const ranked = [...fallbackPosts].sort((a, b) => scorePost(b) - scorePost(a));
+
+  return Array.from({ length: count }, (_, index) => {
+    const absoluteIndex = startIndex + index;
+    const post = ranked[absoluteIndex % ranked.length];
+
+    return {
+      ...post,
+      likes: post.likes + Math.floor(absoluteIndex / ranked.length) * 17,
+      comments: post.comments + Math.floor(absoluteIndex / ranked.length) * 3,
+      shares: post.shares + Math.floor(absoluteIndex / ranked.length),
+      instanceId: `${post.id}-local-${absoluteIndex}`,
+    };
+  });
+}
+
+function mapApiPost(post: ApiFeedPost): FeedPost {
+  const tag = post.tags[0] || (post.format === 'debate' ? 'TrueDebate' : post.format === 'tip' ? 'BonPlan' : 'VlogFeed');
+
+  return {
+    id: post.id,
+    author: post.author,
+    location: post.location || 'TRUEFEED',
+    title: post.title || tag,
+    caption: post.caption,
+    mediaType: post.mediaType,
+    format: post.format,
+    visual: post.location?.slice(0, 10).toUpperCase() || tag.toUpperCase(),
+    tag,
+    likes: post.likesCount,
+    comments: post.commentsCount,
+    shares: post.sharesCount,
+    publishedAt: post.publishedAt,
+  };
+}
+
+function uniqueIncomingPosts(incoming: FeedPost[], current: FeedItem[]) {
+  const currentIds = new Set(current.map((post) => post.id));
+
+  return incoming.filter((post) => !currentIds.has(post.id));
+}
 
 const FeedCard = memo(function FeedCard({
   post,
   theme,
 }: {
-  post: FeedPost;
+  post: FeedItem;
   theme: (typeof seasonThemes)['summer'];
 }) {
   const [liked, setLiked] = useState(false);
@@ -111,7 +177,7 @@ const FeedCard = memo(function FeedCard({
 
       <View style={[styles.visual, { backgroundColor: theme.accentStrong }]}>
         <Chip label={post.tag} backgroundColor="rgba(255,255,255,0.22)" textColor="#FFFFFF" />
-        <Text style={styles.visualEmoji}>{post.visual}</Text>
+        <Text style={styles.visualText}>{post.visual}</Text>
         <View style={styles.mediaBadge}>
           <Ionicons
             name={
@@ -160,7 +226,7 @@ const FeedCard = memo(function FeedCard({
       </View>
 
       <Text style={[styles.likes, { color: theme.text }]}>
-        {likesCount.toLocaleString('fr-FR')} likes · {post.comments} commentaires · {sharesCount}{' '}
+        {likesCount.toLocaleString('fr-FR')} likes - {post.comments} commentaires - {sharesCount}{' '}
         shares
       </Text>
       <Text style={[styles.postTitle, { color: theme.text }]}>{post.title}</Text>
@@ -174,7 +240,13 @@ const FeedCard = memo(function FeedCard({
 
 export default function HomeScreen() {
   const { selectedSeason } = useGlobalSeason();
-  const [sort, setSort] = useState<'recent' | 'popular'>('recent');
+  const listRef = useRef<FlatList<FeedItem>>(null);
+  const loadingRef = useRef(false);
+  const cursorRef = useRef<string | null>(null);
+  const postsRef = useRef<FeedItem[]>(makeFallbackBatch(0, FEED_BATCH_SIZE));
+  const fallbackIndexRef = useRef(FEED_BATCH_SIZE);
+  const [posts, setPosts] = useState<FeedItem[]>(postsRef.current);
+  const [pendingNewPosts, setPendingNewPosts] = useState<FeedPost[]>([]);
   const [hasOwnStory, setHasOwnStory] = useState(false);
   const [showStoryComposer, setShowStoryComposer] = useState(false);
   const [storyText, setStoryText] = useState('');
@@ -182,9 +254,120 @@ export default function HomeScreen() {
   const [storyBackground, setStoryBackground] = useState(storyBackgrounds[0]);
   const theme = seasonThemes[selectedSeason];
   const feed = feedBySeason[selectedSeason];
-  const filteredPosts = [...feedPosts].sort((a, b) => (sort === 'popular' ? b.likes - a.likes : 0));
+
+  const notificationLabel = useMemo(() => {
+    if (pendingNewPosts.length === 0) {
+      return '';
+    }
+
+    return `${pendingNewPosts.length} nouvelle${pendingNewPosts.length > 1 ? 's' : ''} publication${
+      pendingNewPosts.length > 1 ? 's' : ''
+    }`;
+  }, [pendingNewPosts.length]);
+
+  const setFeedPosts = useCallback((nextPosts: FeedItem[]) => {
+    postsRef.current = nextPosts;
+    setPosts(nextPosts);
+  }, []);
+
+  const appendFallbackPosts = useCallback(() => {
+    const nextBatch = makeFallbackBatch(fallbackIndexRef.current, FEED_BATCH_SIZE);
+
+    fallbackIndexRef.current += FEED_BATCH_SIZE;
+    setFeedPosts([...postsRef.current, ...nextBatch]);
+  }, [setFeedPosts]);
+
+  const loadNextPage = useCallback(async () => {
+    if (loadingRef.current) {
+      return;
+    }
+
+    loadingRef.current = true;
+
+    try {
+      const response = await postsApi.listFeed({
+        cursor: cursorRef.current,
+        limit: FEED_BATCH_SIZE,
+        sort: 'algorithm',
+      });
+      const incoming = response.items.map(mapApiPost);
+
+      cursorRef.current = response.nextCursor;
+
+      if (incoming.length === 0) {
+        appendFallbackPosts();
+        return;
+      }
+
+      const nextBatch = incoming.map((post) => ({
+        ...post,
+        instanceId: `${post.id}-api-${postsRef.current.length}`,
+      }));
+      const shouldReplaceFallback =
+        postsRef.current.length === FEED_BATCH_SIZE &&
+        postsRef.current.every((post) => post.instanceId.includes('-local-'));
+
+      setFeedPosts(shouldReplaceFallback ? nextBatch : [...postsRef.current, ...nextBatch]);
+
+      if (!response.nextCursor) {
+        appendFallbackPosts();
+      }
+    } catch {
+      appendFallbackPosts();
+    } finally {
+      loadingRef.current = false;
+    }
+  }, [appendFallbackPosts, setFeedPosts]);
+
+  const refreshNewPosts = useCallback(async () => {
+    try {
+      const response = await postsApi.listFeed({ limit: FEED_BATCH_SIZE, sort: 'algorithm' });
+      const incoming = uniqueIncomingPosts(response.items.map(mapApiPost), postsRef.current);
+
+      if (incoming.length > 0) {
+        setPendingNewPosts(incoming);
+      }
+    } catch {
+      // Background refresh should stay silent while the user scrolls.
+    }
+  }, []);
+
+  const showNewPosts = useCallback(() => {
+    const newItems = pendingNewPosts.map((post, index) => ({
+      ...post,
+      instanceId: `${post.id}-new-${Date.now()}-${index}`,
+    }));
+
+    setFeedPosts([...newItems, ...postsRef.current]);
+    setPendingNewPosts([]);
+    listRef.current?.scrollToOffset({ animated: true, offset: 0 });
+  }, [pendingNewPosts, setFeedPosts]);
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
+      const maxVisibleIndex = viewableItems.reduce(
+        (maxIndex, item) => Math.max(maxIndex, item.index ?? -1),
+        -1,
+      );
+
+      if (postsRef.current.length - maxVisibleIndex <= PREFETCH_DISTANCE + 1) {
+        loadNextPage();
+      }
+    },
+  ).current;
+
+  useEffect(() => {
+    loadNextPage();
+  }, [loadNextPage]);
+
+  useEffect(() => {
+    const interval = setInterval(refreshNewPosts, REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [refreshNewPosts]);
 
   async function pickStoryMedia() {
+    const ImagePicker = await import('expo-image-picker');
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
@@ -214,12 +397,17 @@ export default function HomeScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <FlatList
-        data={filteredPosts}
-        keyExtractor={(item) => item.id}
-        initialNumToRender={2}
-        maxToRenderPerBatch={3}
+        ref={listRef}
+        data={posts}
+        keyExtractor={(item) => item.instanceId}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        onEndReached={loadNextPage}
+        onEndReachedThreshold={0.55}
+        onViewableItemsChanged={onViewableItemsChanged}
         removeClippedSubviews
         showsVerticalScrollIndicator={false}
+        viewabilityConfig={{ itemVisiblePercentThreshold: 35 }}
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View style={styles.headerContent}>
@@ -232,25 +420,20 @@ export default function HomeScreen() {
                 { icon: 'mail', onPress: () => router.push('/messages') },
               ]}
             />
+            {pendingNewPosts.length > 0 ? (
+              <Pressable
+                onPress={showNewPosts}
+                style={[styles.newPostsNotice, { backgroundColor: theme.surface, borderColor: theme.border }]}
+              >
+                <Ionicons name="arrow-up" size={16} color={theme.accentStrong} />
+                <Text style={[styles.newPostsNoticeText, { color: theme.text }]}>
+                  {notificationLabel}
+                </Text>
+              </Pressable>
+            ) : null}
             <View style={styles.skeletonRow}>
               <View style={[styles.skeletonBlock, { backgroundColor: theme.surfaceAlt }]} />
               <View style={[styles.skeletonLine, { backgroundColor: theme.surfaceAlt }]} />
-            </View>
-            <View style={styles.filterRow}>
-              <Chip
-                label="Recent"
-                active={sort === 'recent'}
-                backgroundColor={sort === 'recent' ? theme.accentStrong : theme.surface}
-                textColor={sort === 'recent' ? '#FFFFFF' : theme.muted}
-                onPress={() => setSort('recent')}
-              />
-              <Chip
-                label="Populaire"
-                active={sort === 'popular'}
-                backgroundColor={sort === 'popular' ? theme.accentStrong : theme.surface}
-                textColor={sort === 'popular' ? '#FFFFFF' : theme.muted}
-                onPress={() => setSort('popular')}
-              />
             </View>
             <ScrollView
               horizontal
@@ -351,7 +534,17 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { gap: 18, paddingBottom: 140, paddingHorizontal: 20, paddingTop: 58 },
   headerContent: { gap: 18 },
-  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  newPostsNotice: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  newPostsNoticeText: { fontFamily: fonts.body, fontSize: 13, fontWeight: '900' },
   skeletonRow: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   skeletonBlock: { borderRadius: 18, height: 42, width: 42 },
   skeletonLine: { borderRadius: 999, flex: 1, height: 14 },
@@ -452,7 +645,14 @@ const styles = StyleSheet.create({
   authorName: { fontFamily: fonts.body, fontSize: 18, fontWeight: '800' },
   metaText: { fontFamily: fonts.body, fontSize: 14, marginTop: 4 },
   visual: { gap: 16, height: 330, padding: 18 },
-  visualEmoji: { alignSelf: 'center', fontSize: 92, marginTop: 58 },
+  visualText: {
+    alignSelf: 'center',
+    color: '#FFFFFF',
+    fontFamily: fonts.title,
+    fontSize: 48,
+    fontWeight: '900',
+    marginTop: 76,
+  },
   mediaBadge: {
     alignItems: 'center',
     alignSelf: 'flex-end',

@@ -257,6 +257,9 @@ CREATE TABLE IF NOT EXISTS good_tips (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   place TEXT NOT NULL,
+  address TEXT,
+  category TEXT NOT NULL DEFAULT 'generic',
+  visual_key TEXT NOT NULL DEFAULT 'generic',
   budget TEXT NOT NULL,
   transport TEXT NOT NULL,
   rating NUMERIC(3, 1) NOT NULL DEFAULT 8.0,
@@ -264,6 +267,8 @@ CREATE TABLE IF NOT EXISTS good_tips (
   lng DOUBLE PRECISION,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT good_tips_place_not_blank CHECK (char_length(btrim(place)) > 0),
+  CONSTRAINT good_tips_category_not_blank CHECK (char_length(btrim(category)) > 0),
+  CONSTRAINT good_tips_visual_key_not_blank CHECK (char_length(btrim(visual_key)) > 0),
   CONSTRAINT good_tips_budget_not_blank CHECK (char_length(btrim(budget)) > 0),
   CONSTRAINT good_tips_transport_not_blank CHECK (char_length(btrim(transport)) > 0)
 );

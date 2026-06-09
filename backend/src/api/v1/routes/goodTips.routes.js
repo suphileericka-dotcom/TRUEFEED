@@ -8,6 +8,8 @@ const goodTipsV1Router = express.Router();
 
 const goodTipSchema = {
   place: { type: 'string', required: true, minLength: 2, maxLength: 160 },
+  address: { type: 'string', required: true, minLength: 4, maxLength: 240 },
+  category: { type: 'string', maxLength: 80 },
   budget: { type: 'string', required: true, minLength: 1, maxLength: 80 },
   transport: { type: 'string', required: true, minLength: 2, maxLength: 80 },
 };

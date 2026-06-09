@@ -20,12 +20,51 @@ const giftRewards = [
   { unlockAt: 34, giftNumber: 15, stock: 1 },
 ];
 
+const visualCategories = [
+  { key: 'restaurant', label: 'Restaurant', keywords: ['restaurant', 'resto', 'diner', 'dejeuner', 'food', 'cuisine', 'bistro', 'brasserie', 'ramen', 'sushi', 'pizza'] },
+  { key: 'park', label: 'Parc', keywords: ['parc', 'park', 'jardin', 'garden', 'square', 'nature'] },
+  { key: 'museum', label: 'Musee', keywords: ['musee', 'museum', 'galerie', 'gallery', 'exposition', 'expo'] },
+  { key: 'cafe', label: 'Cafe', keywords: ['cafe', 'coffee', 'espresso', 'brunch', 'patisserie', 'boulangerie'] },
+  { key: 'concert', label: 'Concert', keywords: ['concert', 'musique', 'music', 'live', 'festival', 'scene'] },
+  { key: 'hike', label: 'Randonnee', keywords: ['randonnee', 'hike', 'hiking', 'sentier', 'trail', 'montagne', 'mountain'] },
+  { key: 'monument', label: 'Monument', keywords: ['monument', 'temple', 'sanctuaire', 'shrine', 'chateau', 'palais', 'tour', 'cathedrale'] },
+  { key: 'shopping', label: 'Shopping', keywords: ['shopping', 'boutique', 'magasin', 'mall', 'marche', 'market', 'shop'] },
+  { key: 'beach', label: 'Plage', keywords: ['plage', 'beach', 'mer', 'ocean', 'calanque', 'baie'] },
+  { key: 'hotel', label: 'Hotel', keywords: ['hotel', 'hostel', 'auberge', 'riad', 'logement', 'suite'] },
+  { key: 'bar', label: 'Bar', keywords: ['bar', 'cocktail', 'pub', 'rooftop', 'speakeasy'] },
+  { key: 'theater', label: 'Theatre', keywords: ['theatre', 'cinema', 'spectacle', 'show', 'comedie'] },
+  { key: 'station', label: 'Gare', keywords: ['gare', 'station', 'metro', 'train', 'bus', 'tram'] },
+  { key: 'viewpoint', label: 'Vue', keywords: ['vue', 'view', 'panorama', 'belvedere', 'observatoire', 'sunset'] },
+  { key: 'market', label: 'Marche', keywords: ['marche', 'market', 'brocante', 'bazaar', 'souq', 'nishiki'] },
+];
+
+function normalizeSearchText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function resolveVisual(payload) {
+  const haystack = normalizeSearchText(
+    [payload.category, payload.place, payload.address, payload.transport].filter(Boolean).join(' '),
+  );
+  const match = visualCategories.find((category) =>
+    category.keywords.some((keyword) => haystack.includes(normalizeSearchText(keyword))),
+  );
+
+  return match || { key: 'generic', label: 'Bon plan' };
+}
+
 function toTip(row) {
   return {
     id: row.id,
     userId: row.user_id,
     author: row.author_username,
     place: row.place,
+    address: row.address,
+    category: row.category,
+    visualKey: row.visual_key,
     budget: row.budget,
     transport: row.transport,
     rating: Number(row.rating),
@@ -106,19 +145,32 @@ async function syncRewards(client, userId) {
 
 async function createTip(payload, user) {
   const place = String(payload.place || '').trim();
+  const address = String(payload.address || '').trim();
   const budget = String(payload.budget || '').trim();
   const transport = String(payload.transport || '').trim();
+  const visual = resolveVisual(payload);
+  const category = String(payload.category || visual.label).trim() || visual.label;
 
-  if (place.length < 2 || budget.length < 1 || transport.length < 2) {
-    throw createHttpError(400, 'invalid_good_tip', 'Lieu, budget et transport sont requis.');
+  if (place.length < 2 || address.length < 4 || budget.length < 1 || transport.length < 2) {
+    throw createHttpError(400, 'invalid_good_tip', 'Lieu, adresse, budget et transport sont requis.');
   }
 
   return transaction(async (client) => {
     const result = await client.query(
-      `INSERT INTO good_tips (user_id, place, budget, transport, rating, lat, lng)
-       VALUES ($1, $2, $3, $4, 8.9, $5, $6)
+      `INSERT INTO good_tips (user_id, place, address, category, visual_key, budget, transport, rating, lat, lng)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 8.9, $8, $9)
        RETURNING *`,
-      [user.id, place, budget, transport, payload.lat || null, payload.lng || null],
+      [
+        user.id,
+        place,
+        address,
+        category,
+        visual.key,
+        budget,
+        transport,
+        payload.lat || null,
+        payload.lng || null,
+      ],
     );
     const sharedCount = await syncRewards(client, user.id);
 

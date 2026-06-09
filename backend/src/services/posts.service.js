@@ -94,8 +94,12 @@ function toIso(value) {
   return value instanceof Date ? value.toISOString() : value;
 }
 
-function toCursor(post) {
-  return Buffer.from(`${post.publishedAt}|${post.id}`).toString('base64url');
+function toRecentCursor(post) {
+  return Buffer.from(`recent|${post.publishedAt}|${post.id}`).toString('base64url');
+}
+
+function toOffsetCursor(sort, offset) {
+  return Buffer.from(`${sort}|${offset}`).toString('base64url');
 }
 
 function fromCursor(cursor) {
@@ -104,13 +108,27 @@ function fromCursor(cursor) {
   }
 
   try {
-    const [publishedAt, id] = Buffer.from(cursor, 'base64url').toString('utf8').split('|');
+    const parts = Buffer.from(cursor, 'base64url').toString('utf8').split('|');
+
+    if (parts[0] === 'algorithm' || parts[0] === 'trending') {
+      const offset = Number(parts[1]);
+
+      if (!Number.isFinite(offset) || offset < 0) {
+        throw new Error('Invalid cursor offset.');
+      }
+
+      return { sort: parts[0], offset };
+    }
+
+    const [maybeSort, maybePublishedAt, maybeId] = parts;
+    const publishedAt = maybeId ? maybePublishedAt : maybeSort;
+    const id = maybeId || maybePublishedAt;
 
     if (!publishedAt || !id) {
       throw new Error('Invalid cursor payload.');
     }
 
-    return { publishedAt, id };
+    return { sort: 'recent', publishedAt, id };
   } catch {
     throw createHttpError(400, 'invalid_cursor', 'Cursor invalide.');
   }
@@ -171,9 +189,9 @@ function postSelectSql() {
   `;
 }
 
-async function listFeed({ cursor, limit = pageSizeDefault, sort = 'recent' } = {}) {
+async function listFeed({ cursor, limit = pageSizeDefault, sort = 'algorithm' } = {}) {
   const safeLimit = Math.min(Number(limit) || pageSizeDefault, pageSizeMax);
-  const safeSort = sort === 'trending' ? 'trending' : 'recent';
+  const safeSort = ['algorithm', 'trending', 'recent'].includes(sort) ? sort : 'algorithm';
   const cacheKey = `${safeSort}:${cursor || 'first'}:${safeLimit}`;
   const cached = feedCache.get(cacheKey);
 
@@ -192,24 +210,56 @@ async function listFeed({ cursor, limit = pageSizeDefault, sort = 'recent' } = {
     );
   }
 
+  const offset = cursorData && cursorData.sort === safeSort ? cursorData.offset || 0 : 0;
+
+  if (safeSort !== 'recent') {
+    params.push(offset);
+  }
+
+  const algorithmScore = `
+    (
+      posts.likes_count * 2
+      + posts.comments_count * 3
+      + posts.shares_count * 4
+      + COALESCE(recent_stats.recent_likes, 0) * 5
+      + COALESCE(recent_stats.recent_comments, 0) * 7
+      + COALESCE(recent_stats.recent_shares, 0) * 8
+      + CASE
+          WHEN posts.published_at >= now() - interval '6 hours' THEN 80
+          WHEN posts.published_at >= now() - interval '24 hours' THEN 45
+          WHEN posts.published_at >= now() - interval '72 hours' THEN 20
+          ELSE 0
+        END
+    )::numeric / GREATEST(EXTRACT(EPOCH FROM (now() - posts.published_at)) / 3600, 1)
+  `;
   const orderBy =
-    safeSort === 'trending'
-      ? `((posts.likes_count * 2 + posts.comments_count * 3 + posts.shares_count)::numeric /
-          GREATEST(EXTRACT(EPOCH FROM (now() - posts.published_at)) / 3600, 1)) DESC,
-         posts.published_at DESC,
-         posts.id DESC`
-      : 'posts.published_at DESC, posts.id DESC';
+    safeSort === 'recent'
+      ? 'posts.published_at DESC, posts.id DESC'
+      : `${algorithmScore} DESC, posts.published_at DESC, posts.id DESC`;
+  const offsetSql = safeSort === 'recent' ? '' : `OFFSET $${params.length}`;
   const result = await query(
     `${postSelectSql()}
+     LEFT JOIN LATERAL (
+       SELECT
+         (SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id AND likes.created_at >= now() - interval '48 hours') AS recent_likes,
+         (SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.id AND comments.status = 'published' AND comments.created_at >= now() - interval '48 hours') AS recent_comments,
+         (SELECT COUNT(*) FROM post_shares WHERE post_shares.post_id = posts.id AND post_shares.created_at >= now() - interval '48 hours') AS recent_shares
+     ) AS recent_stats ON true
      WHERE ${where.join(' AND ')}
-     GROUP BY posts.id, users.username
+     GROUP BY posts.id, users.username, recent_stats.recent_likes, recent_stats.recent_comments, recent_stats.recent_shares
      ORDER BY ${orderBy}
-     LIMIT $1`,
+     LIMIT $1
+     ${offsetSql}`,
     params,
   );
   const rows = result.rows.slice(0, safeLimit);
   const items = rows.map(toPost);
-  const nextCursor = result.rows.length > safeLimit ? toCursor(items[items.length - 1]) : null;
+  const nextCursor =
+    result.rows.length > safeLimit
+      ? safeSort === 'recent'
+        ? toRecentCursor(items[items.length - 1])
+        : toOffsetCursor(safeSort, offset + safeLimit)
+      : null;
   const payload = { items, nextCursor, sort: safeSort };
 
   feedCache.set(cacheKey, { payload, expiresAt: Date.now() + 20 * 1000 });

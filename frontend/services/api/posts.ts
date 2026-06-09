@@ -22,7 +22,50 @@ export type PostComment = {
   createdAt: string;
 };
 
+export type FeedPost = {
+  id: string;
+  author: string;
+  title?: string | null;
+  caption: string;
+  mediaUrl?: string | null;
+  mediaType: 'image' | 'video' | 'text';
+  format: 'vlog' | 'photo' | 'tip' | 'debate';
+  location?: string | null;
+  season?: 'spring' | 'summer' | 'autumn' | 'winter' | null;
+  likesCount: number;
+  commentsCount: number;
+  sharesCount: number;
+  tags: string[];
+  publishedAt: string;
+};
+
+export type FeedResponse = {
+  items: FeedPost[];
+  nextCursor: string | null;
+  sort: 'algorithm' | 'trending' | 'recent';
+};
+
 export const postsApi = {
+  listFeed(params: { cursor?: string | null; limit?: number; sort?: 'algorithm' | 'trending' | 'recent' } = {}) {
+    const searchParams = new URLSearchParams();
+
+    if (params.cursor) {
+      searchParams.set('cursor', params.cursor);
+    }
+
+    if (params.limit) {
+      searchParams.set('limit', String(params.limit));
+    }
+
+    if (params.sort) {
+      searchParams.set('sort', params.sort);
+    }
+
+    const queryString = searchParams.toString();
+
+    return apiClient.get<FeedResponse>(`/api/v1/posts/feed${queryString ? `?${queryString}` : ''}`);
+  },
+
   create(payload: CreatePostPayload, authToken: string) {
     return apiClient.post('/api/v1/posts', payload, { authToken });
   },

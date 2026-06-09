@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -25,6 +24,8 @@ export default function PublishScreen() {
   const [selectedMediaUri, setSelectedMediaUri] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
   const [place, setPlace] = useState('');
+  const [address, setAddress] = useState('');
+  const [tipCategory, setTipCategory] = useState('');
   const [budget, setBudget] = useState('');
   const [transport, setTransport] = useState('');
   const [status, setStatus] = useState('');
@@ -33,7 +34,10 @@ export default function PublishScreen() {
   const canPublishText = caption.trim().length >= 2;
   const canPublishMedia = Boolean(selectedMediaUri);
   const canPublishTip =
-    place.trim().length >= 2 && budget.trim().length >= 1 && transport.trim().length >= 2;
+    place.trim().length >= 2 &&
+    address.trim().length >= 4 &&
+    budget.trim().length >= 1 &&
+    transport.trim().length >= 2;
 
   function requireAuth() {
     if (isAuthenticated) {
@@ -50,6 +54,8 @@ export default function PublishScreen() {
     setSelectedMediaUri(null);
     setCaption('');
     setPlace('');
+    setAddress('');
+    setTipCategory('');
     setBudget('');
     setTransport('');
     setStatus('');
@@ -65,6 +71,7 @@ export default function PublishScreen() {
       return;
     }
 
+    const ImagePicker = await import('expo-image-picker');
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
@@ -146,6 +153,8 @@ export default function PublishScreen() {
     try {
       await goodTipsApi.create({
         place: place.trim(),
+        address: address.trim(),
+        category: tipCategory.trim() || undefined,
         budget: budget.trim(),
         transport: transport.trim(),
       });
@@ -296,7 +305,9 @@ export default function PublishScreen() {
         </View>
         <View style={styles.tipShortcutCopy}>
           <Text style={[styles.tipShortcutTitle, { color: theme.text }]}>Bon plan -&gt; Bon Plan</Text>
-          <Text style={[styles.tipShortcutSubtitle, { color: theme.muted }]}>Lieu + budget + transport</Text>
+          <Text style={[styles.tipShortcutSubtitle, { color: theme.muted }]}>
+            Lieu + adresse + prix + transport
+          </Text>
         </View>
         <Ionicons name="chevron-forward" size={28} color={theme.muted} />
       </Pressable>
@@ -311,8 +322,22 @@ export default function PublishScreen() {
             value={place}
           />
           <TextInput
+            onChangeText={setAddress}
+            placeholder="Adresse complete"
+            placeholderTextColor={theme.muted}
+            style={[styles.singleInput, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
+            value={address}
+          />
+          <TextInput
+            onChangeText={setTipCategory}
+            placeholder="Categorie ou mot-cle"
+            placeholderTextColor={theme.muted}
+            style={[styles.singleInput, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
+            value={tipCategory}
+          />
+          <TextInput
             onChangeText={setBudget}
-            placeholder="Budget"
+            placeholder="Prix moyen"
             placeholderTextColor={theme.muted}
             style={[styles.singleInput, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
             value={budget}

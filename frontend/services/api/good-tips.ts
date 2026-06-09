@@ -5,6 +5,9 @@ export type GoodTip = {
   userId: string;
   author: string;
   place: string;
+  address: string;
+  category: string;
+  visualKey: string;
   budget: string;
   transport: string;
   rating: number;
@@ -18,7 +21,7 @@ export const goodTipsApi = {
     return apiClient.get<{ items: GoodTip[] }>('/api/v1/good-tips');
   },
 
-  create(payload: { place: string; budget: string; transport: string }) {
+  create(payload: { place: string; address: string; category?: string; budget: string; transport: string }) {
     return apiClient.post<{ tip: GoodTip; sharedCount: number }, typeof payload>(
       '/api/v1/good-tips',
       payload,
