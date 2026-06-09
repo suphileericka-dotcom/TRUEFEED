@@ -1,6 +1,7 @@
 const express = require('express');
 
 const { authConfig } = require('../../../config/auth');
+const { requireAuth } = require('../../../middlewares/auth');
 const { createRateLimiter } = require('../../../middlewares/rateLimit');
 const { analyticsService } = require('../../../services/analytics.service');
 const { authService } = require('../../../services/auth.service');
@@ -15,10 +16,10 @@ const loginRateLimit = createRateLimiter({
 });
 
 const registerSchema = {
-  username: { type: 'string', required: true, minLength: 3, maxLength: 32 },
+  firstName: { type: 'string', required: true, minLength: 2, maxLength: 60 },
+  lastName: { type: 'string', required: true, minLength: 2, maxLength: 60 },
   email: { type: 'string', required: true, email: true, maxLength: 160 },
   password: { type: 'string', required: true, minLength: authConfig.password.minLength },
-  displayName: { type: 'string', required: true, minLength: 2, maxLength: 80 },
   avatarUrl: { type: 'string', url: true, maxLength: 500 },
   bio: { type: 'string', maxLength: 240 },
 };
@@ -33,8 +34,28 @@ const refreshSchema = {
 };
 
 const verifyEmailSchema = {
+  email: { type: 'string', email: true, maxLength: 160 },
+  code: { type: 'string', maxLength: 160 },
+  token: { type: 'string', maxLength: 160 },
+};
+
+const usernameSchema = {
+  username: { type: 'string', maxLength: 32 },
+  firstName: { type: 'string', required: true, minLength: 2, maxLength: 60 },
+};
+
+const forgotPasswordSchema = {
   email: { type: 'string', required: true, email: true, maxLength: 160 },
-  code: { type: 'string', required: true, minLength: 6, maxLength: 6 },
+};
+
+const resetPasswordSchema = {
+  token: { type: 'string', required: true, minLength: 20, maxLength: 160 },
+  password: { type: 'string', required: true, minLength: authConfig.password.minLength },
+};
+
+const changePasswordSchema = {
+  currentPassword: { type: 'string', required: true, minLength: 1 },
+  newPassword: { type: 'string', required: true, minLength: authConfig.password.minLength },
 };
 
 authV1Router.post('/register', async (req, res, next) => {
@@ -52,7 +73,54 @@ authV1Router.post('/register', async (req, res, next) => {
 authV1Router.post('/verify-email', async (req, res, next) => {
   try {
     const payload = validate(verifyEmailSchema, req.body);
-    const result = await authService.verifyEmail(payload);
+    const result = await authService.verifyEmail({
+      ...payload,
+      code: payload.token || payload.code,
+    });
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+authV1Router.post('/forgot-password', async (req, res, next) => {
+  try {
+    const payload = validate(forgotPasswordSchema, req.body);
+    const result = await authService.requestPasswordReset(payload);
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+authV1Router.post('/reset-password', async (req, res, next) => {
+  try {
+    const payload = validate(resetPasswordSchema, req.body);
+    const result = await authService.resetPassword(payload);
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+authV1Router.post('/change-password', requireAuth, async (req, res, next) => {
+  try {
+    const payload = validate(changePasswordSchema, req.body);
+    const result = await authService.changePassword(req.user.id, payload);
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+authV1Router.post('/username', requireAuth, async (req, res, next) => {
+  try {
+    const payload = validate(usernameSchema, req.body);
+    const result = await authService.completeUsername(req.user.id, payload);
 
     res.json(result);
   } catch (error) {

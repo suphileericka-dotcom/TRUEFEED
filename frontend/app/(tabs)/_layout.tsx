@@ -1,10 +1,12 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { SpaceIcon } from '@/components/truefeed/ui';
-import { seasonThemes, truefeedSpaces, type TruefeedSpaceKey } from '@/constants/truefeed';
+import { fonts, seasonThemes, truefeedSpaces, type TruefeedSpaceKey } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { useSession } from '@/hooks/use-session';
 
 function createTabBarStyle(backgroundColor: string, borderColor: string) {
   return {
@@ -24,6 +26,7 @@ function getSpace(key: TruefeedSpaceKey) {
 
 export default function TabLayout() {
   const { selectedSeason } = useGlobalSeason();
+  const { isAuthenticated, user } = useSession();
   const theme = seasonThemes[selectedSeason];
   const feedSpace = getSpace('feed');
   const bonplanSpace = getSpace('bonplan');
@@ -32,17 +35,25 @@ export default function TabLayout() {
   const debateSpace = getSpace('debate');
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarHideOnKeyboard: true,
-        tabBarActiveTintColor: theme.accentStrong,
-        tabBarInactiveTintColor: theme.muted,
-        tabBarShowLabel: false,
-        tabBarStyle: createTabBarStyle(theme.tabBar, theme.border),
-      }}
-    >
+    <View style={[styles.shell, { backgroundColor: theme.background }]}>
+      {isAuthenticated && !user?.emailVerifiedAt ? (
+        <View style={[styles.emailBanner, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.emailBannerText, { color: theme.muted }]}>
+            Confirme ton adresse email depuis le lien envoye.
+          </Text>
+        </View>
+      ) : null}
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarButton: HapticTab,
+          tabBarHideOnKeyboard: true,
+          tabBarActiveTintColor: theme.accentStrong,
+          tabBarInactiveTintColor: theme.muted,
+          tabBarShowLabel: false,
+          tabBarStyle: createTabBarStyle(theme.tabBar, theme.border),
+        }}
+      >
       <Tabs.Screen
         name="index"
         options={{
@@ -114,6 +125,17 @@ export default function TabLayout() {
           ),
         }}
       />
-    </Tabs>
+      </Tabs>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  shell: { flex: 1 },
+  emailBanner: {
+    borderBottomWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+  },
+  emailBannerText: { fontFamily: fonts.body, fontSize: 12, fontWeight: '800', textAlign: 'center' },
+});

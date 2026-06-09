@@ -64,6 +64,15 @@ export function useSession() {
     setSessionState(nextSession);
   }
 
+  function updateUser(user: AuthUser) {
+    const nextSession = {
+      ...sessionState,
+      user,
+    };
+    writeStoredSession(nextSession);
+    setSessionState(nextSession);
+  }
+
   function deleteAccount() {
     clearStoredSession(false);
     setSessionState(fallbackSession);
@@ -74,6 +83,7 @@ export function useSession() {
     isAdmin: sessionState.user?.role === 'admin',
     signIn,
     signOut,
+    updateUser,
     deleteAccount,
   };
 }

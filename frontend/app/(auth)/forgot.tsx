@@ -5,11 +5,23 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { BrandHeader, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { authApi } from '@/services/api/auth';
 
 export default function ForgotScreen() {
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
   const [email, setEmail] = useState('');
+  const [status, setStatus] = useState('');
+
+  async function sendResetLink() {
+    try {
+      setStatus('Envoi du lien...');
+      await authApi.forgotPassword({ email: email.trim().toLowerCase() });
+      setStatus('Si un compte existe avec cet email, un lien vient d etre envoye.');
+    } catch {
+      setStatus('Impossible d envoyer le lien pour le moment.');
+    }
+  }
 
   return (
     <ScreenShell theme={theme}>
@@ -29,9 +41,10 @@ export default function ForgotScreen() {
           style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
           value={email}
         />
-        <Pressable style={[styles.primary, { backgroundColor: theme.accentStrong }]}>
+        <Pressable onPress={sendResetLink} style={[styles.primary, { backgroundColor: theme.accentStrong }]}>
           <Text style={styles.primaryText}>Envoyer le lien</Text>
         </Pressable>
+        {status ? <Text style={[styles.status, { color: theme.muted }]}>{status}</Text> : null}
         <Link href="/login">
           <Text style={[styles.linkText, { color: theme.accentStrong }]}>Retour connexion</Text>
         </Link>
@@ -48,4 +61,5 @@ const styles = StyleSheet.create({
   primary: { alignItems: 'center', borderRadius: 18, paddingVertical: 16 },
   primaryText: { color: '#FFFFFF', fontFamily: fonts.body, fontSize: 15, fontWeight: '800' },
   linkText: { fontFamily: fonts.body, fontSize: 14, fontWeight: '800', textAlign: 'center' },
+  status: { fontFamily: fonts.body, fontSize: 14, fontWeight: '800', textAlign: 'center' },
 });

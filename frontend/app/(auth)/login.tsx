@@ -56,6 +56,11 @@ export default function LoginScreen() {
           style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
           value={password}
         />
+        <Link href="/forgot">
+          <Text style={[styles.forgotLink, { color: theme.accentStrong }]}>
+            Mot de passe oublie ?
+          </Text>
+        </Link>
 
         <Pressable
           onPress={login}
@@ -67,11 +72,6 @@ export default function LoginScreen() {
         {status ? <Text style={[styles.status, { color: theme.muted }]}>{status}</Text> : null}
 
         <View style={styles.links}>
-          <Link href="/forgot">
-            <Text style={[styles.linkText, { color: theme.accentStrong }]}>
-              Mot de passe oublie
-            </Text>
-          </Link>
           <Link href="/signup">
             <Text style={[styles.linkText, { color: theme.accentStrong }]}>Creer un compte</Text>
           </Link>
@@ -88,7 +88,8 @@ const styles = StyleSheet.create({
   input: { borderRadius: 18, fontFamily: fonts.body, fontSize: 16, padding: 16 },
   primary: { alignItems: 'center', borderRadius: 18, paddingVertical: 16 },
   primaryText: { color: '#FFFFFF', fontFamily: fonts.body, fontSize: 15, fontWeight: '800' },
-  links: { flexDirection: 'row', justifyContent: 'space-between' },
+  links: { alignItems: 'center' },
+  forgotLink: { fontFamily: fonts.body, fontSize: 14, fontWeight: '800', textAlign: 'right' },
   linkText: { fontFamily: fonts.body, fontSize: 14, fontWeight: '800' },
   status: { fontFamily: fonts.body, fontSize: 14, fontWeight: '800', textAlign: 'center' },
 });

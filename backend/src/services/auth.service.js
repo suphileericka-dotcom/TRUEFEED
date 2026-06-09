@@ -95,6 +95,30 @@ function hashVerificationCode(code) {
   return crypto.createHmac('sha256', authConfig.refreshToken.secret).update(code).digest('hex');
 }
 
+function createEmailToken() {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+function getAppUrl() {
+  const origin = process.env.APP_URL || process.env.CLIENT_ORIGIN;
+
+  if (origin && origin !== '*') {
+    return origin.replace(/\/$/, '');
+  }
+
+  return 'http://localhost:8081';
+}
+
+function createAppLink(path, params) {
+  const url = new URL(path, getAppUrl());
+
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, value);
+  });
+
+  return url.toString();
+}
+
 function toPublicUser(row) {
   return {
     id: row.id,
@@ -105,6 +129,7 @@ function toPublicUser(row) {
     bio: row.bio,
     role: row.role,
     status: row.status,
+    emailVerifiedAt: row.email_verified_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -119,6 +144,60 @@ function getAdminEmails() {
 
 function getRoleForEmail(email) {
   return getAdminEmails().includes(email.toLowerCase()) ? 'admin' : 'user';
+}
+
+function normalizeUsername(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^@/, '');
+}
+
+function slugifyUsername(value) {
+  const slug = normalizeUsername(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9._]+/g, '')
+    .replace(/^[._]+|[._]+$/g, '')
+    .slice(0, 24);
+
+  return slug.length >= 3 ? slug : `user${crypto.randomInt(1000, 9999)}`;
+}
+
+function assertValidUsername(username) {
+  if (!/^[a-z0-9._]{3,32}$/.test(username)) {
+    throw createHttpError(
+      400,
+      'invalid_username',
+      'Nom utilisateur invalide: lettres, chiffres, point ou tiret bas uniquement.',
+    );
+  }
+}
+
+async function createAvailableUsername(baseValue, { excludeUserId } = {}) {
+  const base = slugifyUsername(baseValue);
+
+  for (let index = 0; index < 20; index += 1) {
+    const suffix = index === 0 ? '' : String(index + 1);
+    const candidate = `${base}${suffix}`.slice(0, 32);
+    const params = [candidate];
+    const excludeSql = excludeUserId ? 'AND id <> $2' : '';
+
+    if (excludeUserId) {
+      params.push(excludeUserId);
+    }
+
+    const existing = await query(
+      `SELECT id FROM users WHERE lower(username) = lower($1) ${excludeSql} LIMIT 1`,
+      params,
+    );
+
+    if (existing.rowCount === 0) {
+      return candidate;
+    }
+  }
+
+  return `${base.slice(0, 24)}${crypto.randomInt(100000, 999999)}`;
 }
 
 async function createSession(user) {
@@ -147,23 +226,21 @@ async function createSession(user) {
 }
 
 async function register(payload) {
-  const username = String(payload.username || '').trim().toLowerCase();
   const email = String(payload.email || '').trim().toLowerCase();
+  const firstName = String(payload.firstName || '').trim();
+  const lastName = String(payload.lastName || '').trim();
+  const displayName = `${firstName} ${lastName}`.trim();
 
-  if (!/^[a-z0-9._]{3,32}$/.test(username)) {
-    throw createHttpError(
-      400,
-      'invalid_username',
-      'Nom utilisateur invalide: lettres, chiffres, point ou tiret bas uniquement.',
-    );
+  if (displayName.length < 2) {
+    throw createHttpError(400, 'invalid_display_name', 'Prenom et nom requis.');
   }
 
   const existing = await query(
-    `SELECT id, email, username
+    `SELECT id, email
      FROM users
-     WHERE lower(email) = lower($1) OR lower(username) = lower($2)
+     WHERE lower(email) = lower($1)
      LIMIT 1`,
-    [email, username],
+    [email],
   );
 
   if (existing.rowCount > 0) {
@@ -172,13 +249,10 @@ async function register(payload) {
     if (row.email.toLowerCase() === email) {
       throw createHttpError(409, 'email_taken', 'Cet email est deja utilise.');
     }
-
-    if (row.username.toLowerCase() === username) {
-      throw createHttpError(409, 'username_taken', 'Ce nom utilisateur est deja utilise.');
-    }
   }
 
-  const verificationCode = String(crypto.randomInt(100000, 999999));
+  const verificationToken = createEmailToken();
+  const username = await createAvailableUsername(`tmp_${firstName}_${crypto.randomInt(1000, 9999)}`);
   const user = await transaction(async (client) => {
     const result = await client.query(
       `INSERT INTO users (
@@ -195,7 +269,7 @@ async function register(payload) {
       [
         username,
         email,
-        payload.displayName,
+        displayName,
         payload.avatarUrl || null,
         payload.bio || null,
         hashPassword(payload.password),
@@ -213,8 +287,8 @@ async function register(payload) {
 
     await client.query(
       `INSERT INTO email_verification_codes (user_id, code_hash, expires_at)
-       VALUES ($1, $2, now() + interval '15 minutes')`,
-      [createdUser.id, hashVerificationCode(verificationCode)],
+       VALUES ($1, $2, now() + interval '24 hours')`,
+      [createdUser.id, hashVerificationCode(verificationToken)],
     );
 
     return createdUser;
@@ -222,8 +296,10 @@ async function register(payload) {
 
   await mailService.sendMail({
     to: user.email,
-    subject: 'Ton code TRUEFEED',
-    text: `Ton code de verification TRUEFEED est ${verificationCode}. Il expire dans 15 minutes.`,
+    subject: 'Confirme ton compte TRUEFEED',
+    text: `Bienvenue sur TRUEFEED. Confirme ton adresse email avec ce lien valable 24 heures: ${createAppLink('/verify-email', {
+      token: verificationToken,
+    })}`,
   });
 
   return {
@@ -234,33 +310,41 @@ async function register(payload) {
 }
 
 async function verifyEmail({ email, code }) {
+  const token = String(code || '').trim();
+  const params = email ? [email, hashVerificationCode(token)] : [hashVerificationCode(token)];
+  const where = email
+    ? 'lower(users.email) = lower($1) AND email_verification_codes.code_hash = $2'
+    : 'email_verification_codes.code_hash = $1';
   const result = await query(
-    `SELECT users.id, email_verification_codes.id AS code_id, email_verification_codes.code_hash
+    `SELECT users.*, email_verification_codes.id AS code_id
      FROM users
      INNER JOIN email_verification_codes ON email_verification_codes.user_id = users.id
-     WHERE lower(users.email) = lower($1)
+     WHERE ${where}
        AND email_verification_codes.used_at IS NULL
        AND email_verification_codes.expires_at > now()
      ORDER BY email_verification_codes.created_at DESC
      LIMIT 1`,
-    [email],
+    params,
   );
   const row = result.rows[0];
 
-  if (!row || row.code_hash !== hashVerificationCode(String(code || '').trim())) {
-    throw createHttpError(400, 'invalid_verification_code', 'Code de verification invalide.');
+  if (!row) {
+    throw createHttpError(400, 'invalid_verification_link', 'Lien de verification invalide ou expire.');
   }
 
-  await transaction(async (client) => {
+  const updatedUser = await transaction(async (client) => {
     await client.query(`UPDATE email_verification_codes SET used_at = now() WHERE id = $1`, [
       row.code_id,
     ]);
-    await client.query(`UPDATE users SET email_verified_at = now(), updated_at = now() WHERE id = $1`, [
-      row.id,
-    ]);
+    const updated = await client.query(
+      `UPDATE users SET email_verified_at = now(), updated_at = now() WHERE id = $1 RETURNING *`,
+      [row.id],
+    );
+
+    return toPublicUser(updated.rows[0]);
   });
 
-  return { verified: true };
+  return { verified: true, user: updatedUser };
 }
 
 async function login({ email, password }) {
@@ -301,6 +385,93 @@ async function login({ email, password }) {
     user,
     session: await createSession(user),
   };
+}
+
+async function requestPasswordReset({ email }) {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const result = await query(
+    `SELECT * FROM users WHERE lower(email) = lower($1) AND status = 'active' LIMIT 1`,
+    [cleanEmail],
+  );
+  const row = result.rows[0];
+
+  if (!row) {
+    return { sent: true };
+  }
+
+  const token = createEmailToken();
+
+  await query(
+    `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+     VALUES ($1, $2, now() + interval '1 hour')`,
+    [row.id, hashVerificationCode(token)],
+  );
+
+  await mailService.sendMail({
+    to: row.email,
+    subject: 'Reinitialise ton mot de passe TRUEFEED',
+    text: `Tu peux reinitialiser ton mot de passe avec ce lien valable 1 heure: ${createAppLink('/reset-password', {
+      token,
+    })}`,
+  });
+
+  return { sent: true };
+}
+
+async function resetPassword({ token, password }) {
+  const tokenHash = hashVerificationCode(String(token || '').trim());
+  const result = await query(
+    `SELECT password_reset_tokens.id AS token_id, users.*
+     FROM password_reset_tokens
+     INNER JOIN users ON users.id = password_reset_tokens.user_id
+     WHERE password_reset_tokens.token_hash = $1
+       AND password_reset_tokens.used_at IS NULL
+       AND password_reset_tokens.expires_at > now()
+       AND users.status = 'active'
+     LIMIT 1`,
+    [tokenHash],
+  );
+  const row = result.rows[0];
+
+  if (!row) {
+    throw createHttpError(400, 'invalid_reset_link', 'Lien de reinitialisation invalide ou expire.');
+  }
+
+  await transaction(async (client) => {
+    await client.query(`UPDATE password_reset_tokens SET used_at = now() WHERE id = $1`, [
+      row.token_id,
+    ]);
+    await client.query(
+      `UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1`,
+      [row.id, hashPassword(password)],
+    );
+  });
+
+  return { reset: true };
+}
+
+async function changePassword(userId, { currentPassword, newPassword }) {
+  const result = await query(`SELECT * FROM users WHERE id = $1 AND status = 'active' LIMIT 1`, [
+    userId,
+  ]);
+  const row = result.rows[0];
+
+  if (!row || !verifyPassword(currentPassword, row.password_hash)) {
+    throw createHttpError(400, 'invalid_current_password', 'Mot de passe actuel incorrect.');
+  }
+
+  await query(`UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1`, [
+    userId,
+    hashPassword(newPassword),
+  ]);
+
+  await mailService.sendMail({
+    to: row.email,
+    subject: 'Mot de passe TRUEFEED modifie',
+    text: 'Ton mot de passe TRUEFEED vient d etre modifie. Si tu n es pas a l origine de cette action, contacte le support.',
+  });
+
+  return { changed: true };
 }
 
 async function refresh(refreshToken) {
@@ -379,12 +550,47 @@ async function updateProfile(userId, payload) {
   return toPublicUser(result.rows[0]);
 }
 
+async function completeUsername(userId, payload) {
+  const requestedUsername = normalizeUsername(payload.username);
+  const username = requestedUsername || (await createAvailableUsername(payload.firstName, { excludeUserId: userId }));
+
+  assertValidUsername(username);
+
+  const existing = await query(
+    `SELECT id FROM users WHERE lower(username) = lower($1) AND id <> $2 LIMIT 1`,
+    [username, userId],
+  );
+
+  if (existing.rowCount > 0) {
+    throw createHttpError(409, 'username_taken', 'Ce nom utilisateur est deja utilise.');
+  }
+
+  const result = await query(
+    `UPDATE users
+     SET username = $2,
+         updated_at = now()
+     WHERE id = $1
+     RETURNING *`,
+    [userId, username],
+  );
+
+  if (result.rowCount === 0) {
+    throw createHttpError(404, 'user_not_found', 'Utilisateur introuvable.');
+  }
+
+  return { user: toPublicUser(result.rows[0]) };
+}
+
 const authService = {
+  changePassword,
+  completeUsername,
   getUserFromAccessToken,
   login,
   logout,
   refresh,
   register,
+  requestPasswordReset,
+  resetPassword,
   updateProfile,
   verifyEmail,
 };

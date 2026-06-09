@@ -11,6 +11,7 @@ export type AuthUser = {
   bio?: string | null;
   role: UserRole;
   status: string;
+  emailVerifiedAt?: string | null;
 };
 
 export type AuthSession = {
@@ -32,16 +33,38 @@ export const authApi = {
   },
 
   register(payload: {
-    username: string;
+    firstName: string;
+    lastName: string;
     email: string;
     password: string;
-    displayName: string;
   }) {
     return apiClient.post<AuthResponse, typeof payload>('/api/v1/auth/register', payload);
   },
 
-  verifyEmail(payload: { email: string; code: string }) {
-    return apiClient.post<{ verified: boolean }, typeof payload>('/api/v1/auth/verify-email', payload);
+  completeUsername(payload: { username?: string; firstName: string }) {
+    return apiClient.post<{ user: AuthUser }, typeof payload>('/api/v1/auth/username', payload);
+  },
+
+  verifyEmail(payload: { token: string }) {
+    return apiClient.post<{ verified: boolean; user?: AuthUser }, typeof payload>(
+      '/api/v1/auth/verify-email',
+      payload,
+    );
+  },
+
+  forgotPassword(payload: { email: string }) {
+    return apiClient.post<{ sent: boolean }, typeof payload>('/api/v1/auth/forgot-password', payload);
+  },
+
+  resetPassword(payload: { token: string; password: string }) {
+    return apiClient.post<{ reset: boolean }, typeof payload>('/api/v1/auth/reset-password', payload);
+  },
+
+  changePassword(payload: { currentPassword: string; newPassword: string }) {
+    return apiClient.post<{ changed: boolean }, typeof payload>(
+      '/api/v1/auth/change-password',
+      payload,
+    );
   },
 
   logout(refreshToken: string) {

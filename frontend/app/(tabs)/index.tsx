@@ -344,7 +344,7 @@ export default function HomeScreen() {
   }, [pendingNewPosts, setFeedPosts]);
 
   const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
+    ({ viewableItems }: { viewableItems: { index: number | null }[] }) => {
       const maxVisibleIndex = viewableItems.reduce(
         (maxIndex, item) => Math.max(maxIndex, item.index ?? -1),
         -1,
