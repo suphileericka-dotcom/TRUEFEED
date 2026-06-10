@@ -1,9 +1,9 @@
 const { env } = require('../config/env');
 const { logError } = require('../monitoring/logger');
 
-async function sendMail({ to, subject, text }) {
+async function sendMail({ to, subject, text, html }) {
   if (!env.resendApiKey) {
-    console.info('[mail:dev]', { to, subject, text });
+    console.info('[mail:dev]', { to, subject, text, html });
     return { sent: false, provider: 'console' };
   }
 
@@ -18,6 +18,7 @@ async function sendMail({ to, subject, text }) {
       to,
       subject,
       text,
+      html,
     }),
   });
 

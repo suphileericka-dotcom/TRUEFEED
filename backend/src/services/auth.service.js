@@ -119,6 +119,116 @@ function createAppLink(path, params) {
   return url.toString();
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function createActionEmail({ title, preview, body, buttonLabel, actionUrl, footer }) {
+  const safeTitle = escapeHtml(title);
+  const safePreview = escapeHtml(preview);
+  const safeBody = escapeHtml(body);
+  const safeButtonLabel = escapeHtml(buttonLabel);
+  const safeActionUrl = escapeHtml(actionUrl);
+  const safeFooter = escapeHtml(footer || 'Si tu n es pas a l origine de cette action, ignore cet email.');
+
+  return `
+    <!doctype html>
+    <html lang="fr">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${safeTitle}</title>
+      </head>
+      <body style="margin:0;background:#f6f3ee;font-family:Arial,Helvetica,sans-serif;color:#1f2933;">
+        <div style="display:none;max-height:0;overflow:hidden;">${safePreview}</div>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f3ee;padding:28px 12px;">
+          <tr>
+            <td align="center">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #eadfd1;border-radius:22px;overflow:hidden;">
+                <tr>
+                  <td style="background:#f97316;padding:26px 28px;text-align:center;">
+                    <div style="font-size:13px;font-weight:800;letter-spacing:0;text-transform:uppercase;color:#fff7ed;">TRUEFEED</div>
+                    <h1 style="margin:10px 0 0;font-size:30px;line-height:1.15;color:#ffffff;">${safeTitle}</h1>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:28px;">
+                    <p style="margin:0 0 22px;font-size:16px;line-height:1.55;color:#475467;">${safeBody}</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 22px;">
+                      <tr>
+                        <td style="border-radius:14px;background:#111827;">
+                          <a href="${safeActionUrl}" style="display:inline-block;padding:14px 22px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:800;">${safeButtonLabel}</a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin:0 0 16px;font-size:13px;line-height:1.5;color:#667085;">Si le bouton ne fonctionne pas, copie ce lien dans ton navigateur :</p>
+                    <p style="margin:0;word-break:break-all;font-size:13px;line-height:1.5;color:#2563eb;">${safeActionUrl}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:18px 28px;background:#fff7ed;border-top:1px solid #eadfd1;">
+                    <p style="margin:0;font-size:12px;line-height:1.5;color:#7c2d12;">${safeFooter}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+  `;
+}
+
+function createConfirmationEmail(link) {
+  return {
+    subject: 'Confirme ton compte TRUEFEED',
+    text: `Bienvenue sur TRUEFEED. Confirme ton adresse email avec ce lien valable 24 heures: ${link}`,
+    html: createActionEmail({
+      title: 'Confirme ton compte',
+      preview: 'Ton lien de confirmation TRUEFEED est valable 24 heures.',
+      body: 'Bienvenue sur TRUEFEED. Confirme ton adresse email pour finaliser la securite de ton compte.',
+      buttonLabel: 'Confirmer mon email',
+      actionUrl: link,
+      footer: 'Ce lien expire dans 24 heures.',
+    }),
+  };
+}
+
+function createPasswordResetEmail(link) {
+  return {
+    subject: 'Reinitialise ton mot de passe TRUEFEED',
+    text: `Tu peux reinitialiser ton mot de passe avec ce lien valable 1 heure: ${link}`,
+    html: createActionEmail({
+      title: 'Reinitialise ton mot de passe',
+      preview: 'Ton lien de reinitialisation TRUEFEED est valable 1 heure.',
+      body: 'Tu as demande a reinitialiser ton mot de passe. Utilise ce lien pour en choisir un nouveau.',
+      buttonLabel: 'Choisir un nouveau mot de passe',
+      actionUrl: link,
+      footer: 'Ce lien expire dans 1 heure. Ignore cet email si tu n as rien demande.',
+    }),
+  };
+}
+
+function createPasswordChangedEmail() {
+  return {
+    subject: 'Mot de passe TRUEFEED modifie',
+    text: 'Ton mot de passe TRUEFEED vient d etre modifie. Si tu n es pas a l origine de cette action, contacte le support.',
+    html: createActionEmail({
+      title: 'Mot de passe modifie',
+      preview: 'Ton mot de passe TRUEFEED a bien ete modifie.',
+      body: 'Ton mot de passe TRUEFEED vient d etre modifie avec succes.',
+      buttonLabel: 'Ouvrir TRUEFEED',
+      actionUrl: getAppUrl(),
+      footer: 'Si tu n es pas a l origine de cette action, contacte le support immediatement.',
+    }),
+  };
+}
+
 function toPublicUser(row) {
   return {
     id: row.id,
@@ -296,10 +406,7 @@ async function register(payload) {
 
   await mailService.sendMail({
     to: user.email,
-    subject: 'Confirme ton compte TRUEFEED',
-    text: `Bienvenue sur TRUEFEED. Confirme ton adresse email avec ce lien valable 24 heures: ${createAppLink('/verify-email', {
-      token: verificationToken,
-    })}`,
+    ...createConfirmationEmail(createAppLink('/verify-email', { token: verificationToken })),
   });
 
   return {
@@ -409,10 +516,7 @@ async function requestPasswordReset({ email }) {
 
   await mailService.sendMail({
     to: row.email,
-    subject: 'Reinitialise ton mot de passe TRUEFEED',
-    text: `Tu peux reinitialiser ton mot de passe avec ce lien valable 1 heure: ${createAppLink('/reset-password', {
-      token,
-    })}`,
+    ...createPasswordResetEmail(createAppLink('/reset-password', { token })),
   });
 
   return { sent: true };
@@ -467,8 +571,7 @@ async function changePassword(userId, { currentPassword, newPassword }) {
 
   await mailService.sendMail({
     to: row.email,
-    subject: 'Mot de passe TRUEFEED modifie',
-    text: 'Ton mot de passe TRUEFEED vient d etre modifie. Si tu n es pas a l origine de cette action, contacte le support.',
+    ...createPasswordChangedEmail(),
   });
 
   return { changed: true };
