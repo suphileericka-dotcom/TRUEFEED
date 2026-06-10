@@ -10,6 +10,7 @@ const profileSchema = {
   displayName: { type: 'string', minLength: 2, maxLength: 80 },
   avatarUrl: { type: 'string', url: true, maxLength: 500 },
   bio: { type: 'string', maxLength: 240 },
+  language: { type: 'string', enum: ['fr', 'en'] },
 };
 
 usersV1Router.get('/me', requireAuth, (req, res) => {

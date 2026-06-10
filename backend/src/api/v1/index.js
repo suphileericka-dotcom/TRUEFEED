@@ -10,6 +10,7 @@ const { mediaV1Router } = require('./routes/media.routes');
 const { moderationV1Router } = require('./routes/moderation.routes');
 const { postsV1Router } = require('./routes/posts.routes');
 const { searchV1Router } = require('./routes/search.routes');
+const { translationV1Router } = require('./routes/translation.routes');
 const { usersV1Router } = require('./routes/users.routes');
 
 const apiV1Router = express.Router();
@@ -24,6 +25,7 @@ apiV1Router.use('/media', mediaV1Router);
 apiV1Router.use('/moderation', moderationV1Router);
 apiV1Router.use('/posts', postsV1Router);
 apiV1Router.use('/search', searchV1Router);
+apiV1Router.use('/translation', translationV1Router);
 apiV1Router.use('/users', usersV1Router);
 
 module.exports = {

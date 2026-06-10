@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS users (
   display_name TEXT NOT NULL,
   avatar_url TEXT,
   bio TEXT,
+  language TEXT NOT NULL DEFAULT 'fr',
   password_hash TEXT NOT NULL,
   role user_role NOT NULL DEFAULT 'user',
   status user_status NOT NULL DEFAULT 'active',
@@ -57,7 +58,8 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT users_username_length CHECK (char_length(username) BETWEEN 3 AND 32),
-  CONSTRAINT users_email_format CHECK (email ~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$')
+  CONSTRAINT users_email_format CHECK (email ~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$'),
+  CONSTRAINT users_language_check CHECK (language IN ('fr', 'en'))
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS users_username_key ON users (lower(username));
@@ -89,6 +91,18 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 CREATE INDEX IF NOT EXISTS password_reset_tokens_hash_active_idx
   ON password_reset_tokens (token_hash, expires_at DESC)
   WHERE used_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS translation_cache (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_hash TEXT NOT NULL,
+  source_text TEXT NOT NULL,
+  source_language TEXT,
+  target_language TEXT NOT NULL,
+  translated_text TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (source_hash, target_language)
+);
 
 CREATE TABLE IF NOT EXISTS refresh_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

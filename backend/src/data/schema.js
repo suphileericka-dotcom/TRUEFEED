@@ -8,6 +8,7 @@ const dataSchema = {
       displayName: { type: 'string', required: true },
       avatarUrl: { type: 'string', required: false },
       bio: { type: 'string', required: false },
+      language: { type: 'enum', values: ['fr', 'en'], default: 'fr' },
       passwordHash: { type: 'string', required: true, private: true },
       role: { type: 'enum', values: ['user', 'moderator', 'admin'], default: 'user' },
       status: { type: 'enum', values: ['active', 'suspended', 'deleted'], default: 'active' },

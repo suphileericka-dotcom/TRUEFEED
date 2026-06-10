@@ -237,6 +237,7 @@ function toPublicUser(row) {
     displayName: row.display_name,
     avatarUrl: row.avatar_url,
     bio: row.bio,
+    language: row.language || 'fr',
     role: row.role,
     status: row.status,
     emailVerifiedAt: row.email_verified_at,
@@ -640,10 +641,17 @@ async function updateProfile(userId, payload) {
      SET display_name = COALESCE($2, display_name),
          avatar_url = COALESCE($3, avatar_url),
          bio = COALESCE($4, bio),
+         language = COALESCE($5, language),
          updated_at = now()
      WHERE id = $1
      RETURNING *`,
-    [userId, payload.displayName || null, payload.avatarUrl || null, payload.bio || null],
+    [
+      userId,
+      payload.displayName || null,
+      payload.avatarUrl || null,
+      payload.bio || null,
+      payload.language || null,
+    ],
   );
 
   if (result.rowCount === 0) {
