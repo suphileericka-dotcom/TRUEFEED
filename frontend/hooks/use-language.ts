@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react';
+import i18n from '@/i18n';
+import { usersApi } from '@/services/api/users';
+import { readStoredSession } from '@/services/session-storage';
 
 export type AppLanguage = 'fr' | 'en';
 
@@ -19,18 +22,41 @@ function writeLanguage(language: AppLanguage) {
   window.dispatchEvent(new Event('truefeed-language-change'));
 }
 
+async function applyLanguage(language: AppLanguage) {
+  if (i18n.language !== language) {
+    await i18n.changeLanguage(language);
+  }
+}
+
 export function useLanguage() {
   const [language, setLanguageState] = useState<AppLanguage>('fr');
 
   useEffect(() => {
-    setLanguageState(readLanguage());
+    const storedLanguage = readLanguage();
+
+    setLanguageState(storedLanguage);
+    applyLanguage(storedLanguage).catch(() => undefined);
+    readStoredSession()
+      .then((storedSession) => {
+        const profileLanguage = storedSession.user?.language;
+
+        if (profileLanguage === 'fr' || profileLanguage === 'en') {
+          writeLanguage(profileLanguage);
+          setLanguageState(profileLanguage);
+          applyLanguage(profileLanguage).catch(() => undefined);
+        }
+      })
+      .catch(() => undefined);
 
     if (typeof window === 'undefined') {
       return undefined;
     }
 
     function syncLanguage() {
-      setLanguageState(readLanguage());
+      const storedLanguage = readLanguage();
+
+      setLanguageState(storedLanguage);
+      applyLanguage(storedLanguage).catch(() => undefined);
     }
 
     window.addEventListener('storage', syncLanguage);
@@ -45,6 +71,8 @@ export function useLanguage() {
   function setLanguage(nextLanguage: AppLanguage) {
     writeLanguage(nextLanguage);
     setLanguageState(nextLanguage);
+    applyLanguage(nextLanguage).catch(() => undefined);
+    usersApi.updateMe({ language: nextLanguage }).catch(() => undefined);
   }
 
   return { language, setLanguage };

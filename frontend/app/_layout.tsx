@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import 'react-native-reanimated';
+import '@/i18n';
 
 import { GlobalSeasonProvider } from '@/hooks/use-global-season';
 

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { BrandHeader, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
@@ -13,6 +14,7 @@ import { ApiError } from '@/services/api/client';
 const passwordMinLength = 8;
 
 export default function SignupScreen() {
+  const { t } = useTranslation();
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
   const { signIn } = useSession();
@@ -29,27 +31,27 @@ export default function SignupScreen() {
     const cleanEmail = email.trim().toLowerCase();
 
     if (cleanFirstName.length < 2) {
-      setStatus('Ajoute ton prenom.');
+      setStatus(t('errors.firstName'));
       return;
     }
 
     if (cleanLastName.length < 2) {
-      setStatus('Ajoute ton nom.');
+      setStatus(t('errors.lastName'));
       return;
     }
 
     if (password.length < passwordMinLength) {
-      setStatus(`Le mot de passe doit contenir au moins ${passwordMinLength} caracteres.`);
+      setStatus(t('errors.passwordMin', { count: passwordMinLength }));
       return;
     }
 
     if (password !== confirmPassword) {
-      setStatus('Les deux mots de passe ne correspondent pas.');
+      setStatus(t('errors.passwordMismatch'));
       return;
     }
 
     try {
-      setStatus('Creation du compte...');
+      setStatus(t('status.creatingAccount'));
       const result = await authApi.register({
         firstName: cleanFirstName,
         lastName: cleanLastName,
@@ -64,11 +66,11 @@ export default function SignupScreen() {
       });
     } catch (error) {
       if (error instanceof ApiError && error.code === 'email_taken') {
-        setStatus('Cet email a deja un compte. Connecte-toi ou utilise un autre email.');
+        setStatus(t('errors.emailTaken'));
         return;
       }
 
-      setStatus(error instanceof ApiError ? error.message : 'Impossible de creer le compte avec ces informations.');
+      setStatus(error instanceof ApiError ? error.message : t('errors.signupFailed'));
     }
   }
 
@@ -77,8 +79,8 @@ export default function SignupScreen() {
       <View style={styles.topRow}>
         <Ionicons name="arrow-back" size={22} color={theme.text} onPress={() => router.back()} />
       </View>
-      <BrandHeader theme={theme} badgeText="Inscription" badgeIcon="+" />
-      <SectionLabel theme={theme} label="Nouveau compte" />
+      <BrandHeader theme={theme} badgeText={t('auth.signupBadge')} badgeIcon="+" />
+      <SectionLabel theme={theme} label={t('auth.newAccount')} />
 
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <View style={[styles.avatar, { backgroundColor: theme.accentSoft }]}>
@@ -86,12 +88,12 @@ export default function SignupScreen() {
             {firstName.trim()[0]?.toUpperCase() || 'M'}
           </Text>
         </View>
-        <Text style={[styles.title, { color: theme.text }]}>Creer ton compte</Text>
+        <Text style={[styles.title, { color: theme.text }]}>{t('auth.createYourAccount')}</Text>
 
         <TextInput
           autoCapitalize="words"
           onChangeText={setFirstName}
-          placeholder="Prenom"
+          placeholder={t('auth.firstName')}
           placeholderTextColor={theme.muted}
           style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
           value={firstName}
@@ -99,7 +101,7 @@ export default function SignupScreen() {
         <TextInput
           autoCapitalize="words"
           onChangeText={setLastName}
-          placeholder="Nom"
+          placeholder={t('auth.lastName')}
           placeholderTextColor={theme.muted}
           style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
           value={lastName}
@@ -108,14 +110,14 @@ export default function SignupScreen() {
           autoCapitalize="none"
           keyboardType="email-address"
           onChangeText={setEmail}
-          placeholder="Adresse email"
+          placeholder={t('auth.emailAddress')}
           placeholderTextColor={theme.muted}
           style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
           value={email}
         />
         <TextInput
           onChangeText={setPassword}
-          placeholder="Mot de passe"
+          placeholder={t('common.password')}
           placeholderTextColor={theme.muted}
           secureTextEntry
           style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
@@ -123,7 +125,7 @@ export default function SignupScreen() {
         />
         <TextInput
           onChangeText={setConfirmPassword}
-          placeholder="Confirmation du mot de passe"
+          placeholder={t('auth.passwordConfirmation')}
           placeholderTextColor={theme.muted}
           secureTextEntry
           style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
@@ -131,11 +133,11 @@ export default function SignupScreen() {
         />
 
         <Pressable onPress={signup} style={[styles.primary, { backgroundColor: theme.accentStrong }]}>
-          <Text style={styles.primaryText}>Creer le compte</Text>
+          <Text style={styles.primaryText}>{t('auth.createAccount')}</Text>
         </Pressable>
         {status ? <Text style={[styles.status, { color: theme.muted }]}>{status}</Text> : null}
         <Link href="/login">
-          <Text style={[styles.linkText, { color: theme.accentStrong }]}>Compte deja cree</Text>
+          <Text style={[styles.linkText, { color: theme.accentStrong }]}>{t('auth.accountAlreadyCreated')}</Text>
         </Link>
       </View>
     </ScreenShell>

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ScreenShell, SeasonSwitcher, SectionLabel, TruefeedModal } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
@@ -14,6 +15,7 @@ import { ApiError } from '@/services/api/client';
 type Dialog = 'logout' | 'delete' | null;
 
 export default function SettingsScreen() {
+  const { t } = useTranslation();
   const { selectedSeason, setSelectedSeason } = useGlobalSeason();
   const { language, setLanguage } = useLanguage();
   const theme = seasonThemes[selectedSeason];
@@ -27,18 +29,18 @@ export default function SettingsScreen() {
   const rows = isAuthenticated
     ? [
         ...(isAdmin
-          ? [{ icon: 'shield-checkmark-outline' as const, title: 'Admin', onPress: () => router.push('/admin') }]
+          ? [{ icon: 'shield-checkmark-outline' as const, title: t('settings.admin'), onPress: () => router.push('/admin') }]
           : []),
-        { icon: 'log-out-outline' as const, title: 'Se deconnecter', onPress: () => setDialog('logout') },
-        { icon: 'trash-outline' as const, title: 'Supprimer le compte', onPress: () => setDialog('delete') },
+        { icon: 'log-out-outline' as const, title: t('settings.logout'), onPress: () => setDialog('logout') },
+        { icon: 'trash-outline' as const, title: t('settings.deleteAccount'), onPress: () => setDialog('delete') },
       ]
     : [
-        { icon: 'log-in-outline' as const, title: 'Se connecter', onPress: () => router.push('/login') },
+        { icon: 'log-in-outline' as const, title: t('settings.login'), onPress: () => router.push('/login') },
         ...(!hasKnownAccount
           ? [
               {
                 icon: 'person-add-outline' as const,
-                title: 'Creer un compte',
+                title: t('auth.createAccount'),
                 onPress: () => router.push('/signup'),
               },
             ]
@@ -60,25 +62,25 @@ export default function SettingsScreen() {
 
   async function changePassword() {
     if (newPassword.length < 8) {
-      setSecurityStatus('Le nouveau mot de passe doit contenir au moins 8 caracteres.');
+      setSecurityStatus(t('errors.passwordMin', { count: 8 }));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setSecurityStatus('Les deux nouveaux mots de passe ne correspondent pas.');
+      setSecurityStatus(t('errors.passwordMismatch'));
       return;
     }
 
     try {
-      setSecurityStatus('Modification...');
+      setSecurityStatus(t('common.loading'));
       await authApi.changePassword({ currentPassword, newPassword });
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setSecurityStatus('Mot de passe modifie. Un email de confirmation a ete envoye.');
+      setSecurityStatus(t('status.passwordChanged'));
     } catch (error) {
       if (error instanceof ApiError && error.code === 'invalid_current_password') {
-        setSecurityStatus('Mot de passe actuel incorrect.');
+        setSecurityStatus(t('errors.currentPassword'));
         return;
       }
 
@@ -90,26 +92,26 @@ export default function SettingsScreen() {
     <ScreenShell theme={theme}>
       <View style={styles.topRow}>
         <Ionicons name="arrow-back" size={22} color={theme.text} onPress={() => router.back()} />
-        <SectionLabel theme={theme} label="Profil et parametres" />
+        <SectionLabel theme={theme} label={t('settings.profileSettings')} />
       </View>
 
       <View style={[styles.profileCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <View style={[styles.avatar, { backgroundColor: theme.accentSoft }]}>
           <Ionicons name="person" size={34} color={theme.accentStrong} />
         </View>
-        <Text style={[styles.name, { color: theme.text }]}>Compte TRUEFEED</Text>
+        <Text style={[styles.name, { color: theme.text }]}>{t('settings.account')}</Text>
         <Text style={[styles.meta, { color: theme.muted }]}>
-          {isAuthenticated ? 'Connecte' : 'Non connecte'}
+          {isAuthenticated ? t('settings.connected') : t('settings.disconnected')}
         </Text>
       </View>
 
       <View style={[styles.themeCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.themeTitle, { color: theme.text }]}>Theme</Text>
+        <Text style={[styles.themeTitle, { color: theme.text }]}>{t('settings.theme')}</Text>
         <SeasonSwitcher selectedSeason={selectedSeason} onSelect={setSelectedSeason} />
       </View>
 
       <View style={[styles.themeCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.themeTitle, { color: theme.text }]}>Langue</Text>
+        <Text style={[styles.themeTitle, { color: theme.text }]}>{t('settings.language')}</Text>
         <View style={styles.languageRow}>
           <Pressable
             onPress={() => setLanguage('fr')}
@@ -119,7 +121,7 @@ export default function SettingsScreen() {
             ]}
           >
             <Text style={[styles.languageText, { color: language === 'fr' ? '#FFFFFF' : theme.text }]}>
-              Francais
+              {t('settings.french')}
             </Text>
           </Pressable>
           <Pressable
@@ -130,7 +132,7 @@ export default function SettingsScreen() {
             ]}
           >
             <Text style={[styles.languageText, { color: language === 'en' ? '#FFFFFF' : theme.text }]}>
-              English
+              {t('settings.english')}
             </Text>
           </Pressable>
         </View>
@@ -138,10 +140,10 @@ export default function SettingsScreen() {
 
       {isAuthenticated ? (
         <View style={[styles.themeCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.themeTitle, { color: theme.text }]}>Securite</Text>
+          <Text style={[styles.themeTitle, { color: theme.text }]}>{t('settings.security')}</Text>
           <TextInput
             onChangeText={setCurrentPassword}
-            placeholder="Mot de passe actuel"
+            placeholder={t('settings.currentPassword')}
             placeholderTextColor={theme.muted}
             secureTextEntry
             style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
@@ -149,7 +151,7 @@ export default function SettingsScreen() {
           />
           <TextInput
             onChangeText={setNewPassword}
-            placeholder="Nouveau mot de passe"
+            placeholder={t('common.newPassword')}
             placeholderTextColor={theme.muted}
             secureTextEntry
             style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
@@ -157,14 +159,14 @@ export default function SettingsScreen() {
           />
           <TextInput
             onChangeText={setConfirmPassword}
-            placeholder="Confirmer le nouveau mot de passe"
+            placeholder={t('settings.confirmNewPassword')}
             placeholderTextColor={theme.muted}
             secureTextEntry
             style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
             value={confirmPassword}
           />
           <Pressable onPress={changePassword} style={[styles.primary, { backgroundColor: theme.accentStrong }]}>
-            <Text style={styles.primaryText}>Modifier le mot de passe</Text>
+            <Text style={styles.primaryText}>{t('auth.changePassword')}</Text>
           </Pressable>
           {securityStatus ? (
             <Text style={[styles.statusText, { color: theme.muted }]}>{securityStatus}</Text>
@@ -187,14 +189,14 @@ export default function SettingsScreen() {
       <TruefeedModal
         visible={dialog !== null}
         theme={theme}
-        title={dialog === 'delete' ? 'Supprimer le compte ?' : 'Se deconnecter ?'}
+        title={dialog === 'delete' ? t('settings.deleteAccount') : t('settings.logout')}
         message={
           dialog === 'delete'
             ? 'Cette action supprimera le compte apres confirmation cote serveur.'
             : 'Tu pourras te reconnecter ensuite.'
         }
-        secondaryLabel="Annuler"
-        primaryLabel={dialog === 'delete' ? 'Supprimer' : 'Confirmer'}
+        secondaryLabel={t('common.cancel')}
+        primaryLabel={dialog === 'delete' ? t('common.delete') : t('common.confirm')}
         onClose={() => setDialog(null)}
         onPrimary={confirmDialog}
       />

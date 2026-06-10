@@ -125,4 +125,12 @@ export const apiClient = {
       body: JSON.stringify(payload),
     });
   },
+
+  patch<TResponse, TPayload>(path: string, payload: TPayload, options?: RequestOptions) {
+    return request<TResponse>(path, {
+      ...options,
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
 };

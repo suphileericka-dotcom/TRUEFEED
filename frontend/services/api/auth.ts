@@ -9,6 +9,7 @@ export type AuthUser = {
   displayName: string;
   avatarUrl?: string | null;
   bio?: string | null;
+  language?: 'fr' | 'en';
   role: UserRole;
   status: string;
   emailVerifiedAt?: string | null;

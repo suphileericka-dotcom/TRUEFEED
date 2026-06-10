@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { SpaceIcon } from '@/components/truefeed/ui';
@@ -25,6 +26,7 @@ function getSpace(key: TruefeedSpaceKey) {
 }
 
 export default function TabLayout() {
+  const { t } = useTranslation();
   const { selectedSeason } = useGlobalSeason();
   const { isAuthenticated, user } = useSession();
   const theme = seasonThemes[selectedSeason];
@@ -39,7 +41,7 @@ export default function TabLayout() {
       {isAuthenticated && !user?.emailVerifiedAt ? (
         <View style={[styles.emailBanner, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={[styles.emailBannerText, { color: theme.muted }]}>
-            Confirme ton adresse email depuis le lien envoye.
+            {t('feed.confirmEmailBanner')}
           </Text>
         </View>
       ) : null}

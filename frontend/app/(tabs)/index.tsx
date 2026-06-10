@@ -11,10 +11,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { BrandHeader, Chip, TruefeedModal } from '@/components/truefeed/ui';
 import { feedBySeason, fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { useTranslatedText } from '@/hooks/use-translated-text';
 import { type FeedPost as ApiFeedPost, postsApi } from '@/services/api/posts';
 
 type FeedPost = {
@@ -156,6 +158,10 @@ const FeedCard = memo(function FeedCard({
   post: FeedItem;
   theme: (typeof seasonThemes)['summer'];
 }) {
+  const { t } = useTranslation();
+  const translatedLocation = useTranslatedText(post.location);
+  const translatedTitle = useTranslatedText(post.title);
+  const translatedCaption = useTranslatedText(post.caption);
   const [liked, setLiked] = useState(false);
   const [shared, setShared] = useState(false);
   const [shareNotice, setShareNotice] = useState('');
@@ -170,7 +176,7 @@ const FeedCard = memo(function FeedCard({
       <View style={styles.postHeader}>
         <View>
           <Text style={[styles.authorName, { color: theme.text }]}>{post.author}</Text>
-          <Text style={[styles.metaText, { color: theme.muted }]}>{post.location}</Text>
+          <Text style={[styles.metaText, { color: theme.muted }]}>{translatedLocation}</Text>
         </View>
         <Ionicons name="ellipsis-horizontal" size={18} color={theme.muted} />
       </View>
@@ -190,7 +196,7 @@ const FeedCard = memo(function FeedCard({
             size={18}
             color="#FFFFFF"
           />
-          <Text style={styles.mediaBadgeText}>{post.mediaType}</Text>
+          <Text style={styles.mediaBadgeText}>{t(`feed.media.${post.mediaType}`)}</Text>
         </View>
       </View>
 
@@ -208,11 +214,11 @@ const FeedCard = memo(function FeedCard({
         <Pressable
           onPress={() => {
             setShared(true);
-            setShareNotice('Partage pret');
+            setShareNotice(t('status.shareReady'));
             Share.share({
-              message: `${post.title} - ${post.caption}`,
-              title: post.title,
-            }).catch(() => setShareNotice('Lien pret a partager'));
+              message: `${translatedTitle} - ${translatedCaption}`,
+              title: translatedTitle,
+            }).catch(() => setShareNotice(t('status.linkReadyToShare')));
           }}
         >
           <Ionicons
@@ -226,11 +232,11 @@ const FeedCard = memo(function FeedCard({
       </View>
 
       <Text style={[styles.likes, { color: theme.text }]}>
-        {likesCount.toLocaleString('fr-FR')} likes - {post.comments} commentaires - {sharesCount}{' '}
-        shares
+        {likesCount.toLocaleString('fr-FR')} {t('feed.likes')} - {post.comments} {t('feed.comments')} -{' '}
+        {sharesCount} {t('feed.shares')}
       </Text>
-      <Text style={[styles.postTitle, { color: theme.text }]}>{post.title}</Text>
-      <Text style={[styles.caption, { color: theme.muted }]}>{post.caption}</Text>
+      <Text style={[styles.postTitle, { color: theme.text }]}>{translatedTitle}</Text>
+      <Text style={[styles.caption, { color: theme.muted }]}>{translatedCaption}</Text>
       {shareNotice ? (
         <Text style={[styles.shareNotice, { color: theme.accentStrong }]}>{shareNotice}</Text>
       ) : null}
@@ -239,6 +245,7 @@ const FeedCard = memo(function FeedCard({
 });
 
 export default function HomeScreen() {
+  const { t } = useTranslation();
   const { selectedSeason } = useGlobalSeason();
   const listRef = useRef<FlatList<FeedItem>>(null);
   const loadingRef = useRef(false);
@@ -260,10 +267,8 @@ export default function HomeScreen() {
       return '';
     }
 
-    return `${pendingNewPosts.length} nouvelle${pendingNewPosts.length > 1 ? 's' : ''} publication${
-      pendingNewPosts.length > 1 ? 's' : ''
-    }`;
-  }, [pendingNewPosts.length]);
+    return t('feed.newPosts', { count: pendingNewPosts.length });
+  }, [pendingNewPosts.length, t]);
 
   const setFeedPosts = useCallback((nextPosts: FeedItem[]) => {
     postsRef.current = nextPosts;
@@ -454,7 +459,7 @@ export default function HomeScreen() {
                     <Ionicons name="add" size={17} color="#FFFFFF" />
                   </View>
                 </View>
-                <Text style={[styles.storyName, { color: theme.muted }]}>Ta story</Text>
+                <Text style={[styles.storyName, { color: theme.muted }]}>{t('feed.yourStory')}</Text>
               </Pressable>
               {storyProfiles.map((story) => (
                 <View key={story.name} style={styles.storyItem}>
@@ -475,26 +480,26 @@ export default function HomeScreen() {
       <TruefeedModal
         visible={showStoryComposer}
         theme={theme}
-        title="Nouvelle story"
-        message="Ajoute un media, un texte, ou les deux."
-        secondaryLabel="Annuler"
-        primaryLabel="Publier"
+        title={t('feed.newStory')}
+        message={t('feed.storyMessage')}
+        secondaryLabel={t('common.cancel')}
+        primaryLabel={t('common.publish')}
         onClose={() => setShowStoryComposer(false)}
         onPrimary={publishStory}
       >
         <View style={[styles.storyComposerPreview, { backgroundColor: storyBackground }]}>
           <Text style={styles.storyComposerKicker}>
-            {storyMediaType ? (storyMediaType === 'video' ? 'Video' : 'Photo') : 'Texte'}
+            {storyMediaType ? t(`feed.media.${storyMediaType}`) : t('feed.media.text')}
           </Text>
           <Text style={styles.storyComposerText}>
-            {storyText.trim() || 'Ecris quelque chose sur ta story'}
+            {storyText.trim() || t('feed.storyEmptyPreview')}
           </Text>
         </View>
         <TextInput
           multiline
           value={storyText}
           onChangeText={setStoryText}
-          placeholder="Texte de ta story..."
+          placeholder={t('feed.storyPlaceholder')}
           placeholderTextColor={theme.muted}
           style={[
             styles.storyTextInput,
@@ -522,7 +527,7 @@ export default function HomeScreen() {
         >
           <Ionicons name="image-outline" size={20} color={theme.accentStrong} />
           <Text style={[styles.storyMediaButtonText, { color: theme.text }]}>
-            Choisir photo/video
+            {t('feed.chooseMedia')}
           </Text>
         </Pressable>
       </TruefeedModal>

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { BrandHeader, MediaSelector, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, publishMediaOptions, seasonThemes } from '@/constants/truefeed';
@@ -16,6 +17,7 @@ type PublishMode = 'normal' | 'text' | 'media' | 'tip';
 const maxTextLength = 2200;
 
 export default function PublishScreen() {
+  const { t } = useTranslation();
   const { selectedSeason } = useGlobalSeason();
   const { isAuthenticated, session } = useSession();
   const theme = seasonThemes[selectedSeason];
@@ -75,7 +77,7 @@ export default function PublishScreen() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      setStatus('Autorise la galerie pour choisir un media.');
+      setStatus(t('errors.mediaPermission'));
       return;
     }
 
@@ -117,7 +119,7 @@ export default function PublishScreen() {
       resetDraft();
       router.push('/debate');
     } catch {
-      setStatus('Impossible de publier ce texte pour le moment.');
+      setStatus(t('errors.publishTextFailed'));
     }
   }
 
@@ -129,7 +131,7 @@ export default function PublishScreen() {
     try {
       await postsApi.create(
         {
-          caption: caption.trim() || 'Publication media',
+          caption: caption.trim() || t('publish.mediaPostFallback'),
           mediaType: mediaType === 'video' ? 'video' : 'image',
           mediaUrl: 'https://truefeed-production.up.railway.app/media-placeholder',
           format: mediaType === 'video' ? 'vlog' : 'photo',
@@ -141,7 +143,7 @@ export default function PublishScreen() {
       resetDraft();
       router.push('/(tabs)');
     } catch {
-      setStatus('Media selectionne. Envoi au feed indisponible pour le moment.');
+      setStatus(t('errors.publishMediaFailed'));
     }
   }
 
@@ -161,7 +163,7 @@ export default function PublishScreen() {
       resetDraft();
       router.push('/bonplan');
     } catch {
-      setStatus('Impossible de publier ce bon plan pour le moment.');
+      setStatus(t('errors.publishTipFailed'));
     }
   }
 
@@ -177,7 +179,7 @@ export default function PublishScreen() {
               onPress={publishText}
               style={[styles.expandedPublishButton, { opacity: canPublishText ? 1 : 0.48 }]}
             >
-              <Text style={styles.expandedPublishText}>Publier</Text>
+              <Text style={styles.expandedPublishText}>{t('common.publish')}</Text>
             </Pressable>
           </View>
           <TextInput
@@ -185,7 +187,7 @@ export default function PublishScreen() {
             multiline
             maxLength={maxTextLength}
             onChangeText={setCaption}
-            placeholder="Ecris ton texte..."
+            placeholder={t('publish.textPlaceholder')}
             placeholderTextColor="rgba(255,255,255,0.72)"
             style={styles.expandedTextInput}
             textAlignVertical="top"
@@ -194,7 +196,7 @@ export default function PublishScreen() {
           <View style={styles.expandedBottomRow}>
             <Pressable onPress={resetDraft} style={styles.deleteButton}>
               <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.deleteText}>Supprimer</Text>
+              <Text style={styles.deleteText}>{t('common.delete')}</Text>
             </Pressable>
             <Text style={styles.counterText}>
               {caption.length}/{maxTextLength}
@@ -213,14 +215,16 @@ export default function PublishScreen() {
           <Pressable onPress={resetDraft} style={[styles.iconButton, { backgroundColor: theme.surfaceAlt }]}>
             <Ionicons name="arrow-back" size={20} color={theme.text} />
           </Pressable>
-          <SectionLabel theme={theme} label={mediaType === 'video' ? 'Video' : 'Image'} />
+          <SectionLabel theme={theme} label={mediaType === 'video' ? t('feed.media.video') : t('feed.media.image')} />
         </View>
 
         <View style={[styles.mediaPanel, { backgroundColor: theme.accentStrong, borderColor: theme.border }]}>
           <View style={styles.mediaTopRow}>
             <View>
-              <Text style={styles.mediaKicker}>Media</Text>
-              <Text style={styles.mediaTitle}>{activeMedia?.label ?? 'Media'} selectionne</Text>
+              <Text style={styles.mediaKicker}>{t('publish.media')}</Text>
+              <Text style={styles.mediaTitle}>
+                {activeMedia?.label ?? t('publish.media')} {t('publish.selected')}
+              </Text>
             </View>
             <View style={styles.mediaIconBubble}>
               <Ionicons name={activeMedia?.icon ?? 'image-outline'} size={24} color="#FFFFFF" />
@@ -228,14 +232,14 @@ export default function PublishScreen() {
           </View>
           <View style={styles.mediaPreview}>
             <Ionicons name={activeMedia?.icon ?? 'image-outline'} size={58} color="#FFFFFF" />
-            <Text style={styles.mediaPreviewText}>Media pret a publier</Text>
+            <Text style={styles.mediaPreviewText}>{t('publish.mediaReady')}</Text>
           </View>
         </View>
 
         <TextInput
           multiline
           onChangeText={setCaption}
-          placeholder="Description optionnelle"
+          placeholder={t('publish.descriptionOptional')}
           placeholderTextColor={theme.muted}
           style={[
             styles.captionInput,
@@ -253,7 +257,7 @@ export default function PublishScreen() {
           ]}
         >
           <Text style={[styles.primaryButtonText, { color: selectedSeason === 'winter' ? '#0F172A' : '#FFFFFF' }]}>
-            Publier
+            {t('common.publish')}
           </Text>
         </Pressable>
         {status ? <Text style={[styles.statusText, { color: theme.muted }]}>{status}</Text> : null}
@@ -263,14 +267,16 @@ export default function PublishScreen() {
 
   return (
     <ScreenShell theme={theme}>
-      <BrandHeader theme={theme} badgeText="Composer un post" badgeIcon="+" />
-      <SectionLabel theme={theme} label="Page publication" />
+      <BrandHeader theme={theme} badgeText={t('publish.compose')} badgeIcon="+" />
+      <SectionLabel theme={theme} label={t('publish.publishPage')} />
 
       <View style={[styles.mediaPanel, { backgroundColor: theme.accentStrong, borderColor: theme.border }]}>
         <View style={styles.mediaTopRow}>
           <View>
-            <Text style={styles.mediaKicker}>Media</Text>
-            <Text style={styles.mediaTitle}>{activeMedia?.label ?? 'Media'} principal</Text>
+            <Text style={styles.mediaKicker}>{t('publish.media')}</Text>
+            <Text style={styles.mediaTitle}>
+              {activeMedia?.label ?? t('publish.media')} {t('publish.mainMedia')}
+            </Text>
           </View>
           <View style={styles.mediaIconBubble}>
             <Ionicons name={activeMedia?.icon ?? 'image-outline'} size={24} color="#FFFFFF" />
@@ -279,7 +285,7 @@ export default function PublishScreen() {
 
         <View style={styles.mediaPreview}>
           <Ionicons name={activeMedia?.icon ?? 'image-outline'} size={58} color="#FFFFFF" />
-          <Text style={styles.mediaPreviewText}>Choisis une photo, une video ou un texte</Text>
+          <Text style={styles.mediaPreviewText}>{t('publish.chooseMedia')}</Text>
         </View>
 
         <MediaSelector
@@ -304,9 +310,9 @@ export default function PublishScreen() {
           <Ionicons name="location-outline" size={34} color="#49B761" />
         </View>
         <View style={styles.tipShortcutCopy}>
-          <Text style={[styles.tipShortcutTitle, { color: theme.text }]}>Bon plan -&gt; Bon Plan</Text>
+          <Text style={[styles.tipShortcutTitle, { color: theme.text }]}>{t('publish.goodTipShortcut')}</Text>
           <Text style={[styles.tipShortcutSubtitle, { color: theme.muted }]}>
-            Lieu + adresse + prix + transport
+            {t('publish.goodTipSubtitle')}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={28} color={theme.muted} />
@@ -316,48 +322,48 @@ export default function PublishScreen() {
         <View style={[styles.tipForm, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <TextInput
             onChangeText={setPlace}
-            placeholder="Lieu"
+            placeholder={t('publish.place')}
             placeholderTextColor={theme.muted}
             style={[styles.singleInput, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
             value={place}
           />
           <TextInput
             onChangeText={setAddress}
-            placeholder="Adresse complete"
+            placeholder={t('publish.address')}
             placeholderTextColor={theme.muted}
             style={[styles.singleInput, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
             value={address}
           />
           <TextInput
             onChangeText={setTipCategory}
-            placeholder="Categorie ou mot-cle"
+            placeholder={t('publish.category')}
             placeholderTextColor={theme.muted}
             style={[styles.singleInput, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
             value={tipCategory}
           />
           <TextInput
             onChangeText={setBudget}
-            placeholder="Prix moyen"
+            placeholder={t('publish.averagePrice')}
             placeholderTextColor={theme.muted}
             style={[styles.singleInput, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
             value={budget}
           />
           <TextInput
             onChangeText={setTransport}
-            placeholder="Transport"
+            placeholder={t('publish.transport')}
             placeholderTextColor={theme.muted}
             style={[styles.singleInput, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
             value={transport}
           />
           <View style={styles.tipActions}>
             <Pressable onPress={resetDraft} style={[styles.secondaryButton, { borderColor: theme.border }]}>
-              <Text style={[styles.secondaryButtonText, { color: theme.text }]}>Retour</Text>
+              <Text style={[styles.secondaryButtonText, { color: theme.text }]}>{t('common.back')}</Text>
             </Pressable>
             <Pressable
               onPress={publishTip}
               style={[styles.primaryButton, { backgroundColor: theme.text, opacity: canPublishTip ? 1 : 0.5 }]}
             >
-              <Text style={styles.primaryButtonText}>Publier</Text>
+              <Text style={styles.primaryButtonText}>{t('common.publish')}</Text>
             </Pressable>
           </View>
         </View>

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { BrandHeader, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
@@ -10,16 +11,17 @@ import { useSession } from '@/hooks/use-session';
 import { authApi } from '@/services/api/auth';
 
 export default function VerifyEmailScreen() {
+  const { t } = useTranslation();
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
   const { token } = useLocalSearchParams<{ token?: string }>();
   const { updateUser } = useSession();
-  const [status, setStatus] = useState('Verification en cours...');
+  const [status, setStatus] = useState(t('status.verificationProgress'));
   const [verified, setVerified] = useState(false);
 
   useEffect(() => {
     if (!token) {
-      setStatus('Lien de confirmation invalide.');
+      setStatus(t('errors.invalidConfirmationLink'));
       return;
     }
 
@@ -31,15 +33,15 @@ export default function VerifyEmailScreen() {
         }
 
         setVerified(true);
-        setStatus('Adresse email confirmee.');
+        setStatus(t('status.emailVerified'));
       })
-      .catch(() => setStatus('Lien expire ou deja utilise.'));
-  }, [token, updateUser]);
+      .catch(() => setStatus(t('status.linkExpired')));
+  }, [t, token, updateUser]);
 
   return (
     <ScreenShell theme={theme}>
-      <BrandHeader theme={theme} badgeText="Email" badgeIcon="✓" />
-      <SectionLabel theme={theme} label="Confirmation" />
+      <BrandHeader theme={theme} badgeText={t('auth.verifyBadge')} badgeIcon="*" />
+      <SectionLabel theme={theme} label={t('auth.verifyLabel')} />
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <View style={[styles.iconCircle, { backgroundColor: theme.accentSoft }]}>
           <Ionicons
@@ -48,10 +50,13 @@ export default function VerifyEmailScreen() {
             color={theme.accentStrong}
           />
         </View>
-        <Text style={[styles.title, { color: theme.text }]}>Confirmation email</Text>
+        <Text style={[styles.title, { color: theme.text }]}>{t('auth.verifyTitle')}</Text>
         <Text style={[styles.copy, { color: theme.muted }]}>{status}</Text>
-        <Pressable onPress={() => router.replace('/(tabs)')} style={[styles.primary, { backgroundColor: theme.accentStrong }]}>
-          <Text style={styles.primaryText}>Retour a l application</Text>
+        <Pressable
+          onPress={() => router.replace('/(tabs)')}
+          style={[styles.primary, { backgroundColor: theme.accentStrong }]}
+        >
+          <Text style={styles.primaryText}>{t('auth.backToApp')}</Text>
         </Pressable>
       </View>
     </ScreenShell>

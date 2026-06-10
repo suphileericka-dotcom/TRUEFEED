@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { BrandHeader, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
@@ -11,6 +12,7 @@ import { ApiError } from '@/services/api/client';
 const passwordMinLength = 8;
 
 export default function ResetPasswordScreen() {
+  const { t } = useTranslation();
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
   const { token } = useLocalSearchParams<{ token?: string }>();
@@ -20,38 +22,38 @@ export default function ResetPasswordScreen() {
 
   async function resetPassword() {
     if (!token) {
-      setStatus('Lien de reinitialisation invalide.');
+      setStatus(t('errors.invalidResetLink'));
       return;
     }
 
     if (password.length < passwordMinLength) {
-      setStatus(`Le mot de passe doit contenir au moins ${passwordMinLength} caracteres.`);
+      setStatus(t('errors.passwordMin', { count: passwordMinLength }));
       return;
     }
 
     if (password !== confirmPassword) {
-      setStatus('Les deux mots de passe ne correspondent pas.');
+      setStatus(t('errors.passwordMismatch'));
       return;
     }
 
     try {
-      setStatus('Modification du mot de passe...');
+      setStatus(t('status.changingPassword'));
       await authApi.resetPassword({ token: String(token), password });
       router.replace('/login');
     } catch (error) {
-      setStatus(error instanceof ApiError ? error.message : 'Lien expire ou invalide.');
+      setStatus(error instanceof ApiError ? error.message : t('errors.expiredResetLink'));
     }
   }
 
   return (
     <ScreenShell theme={theme}>
-      <BrandHeader theme={theme} badgeText="Securite" badgeIcon="*" />
-      <SectionLabel theme={theme} label="Nouveau mot de passe" />
+      <BrandHeader theme={theme} badgeText={t('auth.resetBadge')} badgeIcon="*" />
+      <SectionLabel theme={theme} label={t('auth.resetLabel')} />
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.title, { color: theme.text }]}>Reinitialiser</Text>
+        <Text style={[styles.title, { color: theme.text }]}>{t('auth.resetTitle')}</Text>
         <TextInput
           onChangeText={setPassword}
-          placeholder="Nouveau mot de passe"
+          placeholder={t('common.newPassword')}
           placeholderTextColor={theme.muted}
           secureTextEntry
           style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
@@ -59,14 +61,14 @@ export default function ResetPasswordScreen() {
         />
         <TextInput
           onChangeText={setConfirmPassword}
-          placeholder="Confirmer le nouveau mot de passe"
+          placeholder={t('settings.confirmNewPassword')}
           placeholderTextColor={theme.muted}
           secureTextEntry
           style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
           value={confirmPassword}
         />
         <Pressable onPress={resetPassword} style={[styles.primary, { backgroundColor: theme.accentStrong }]}>
-          <Text style={styles.primaryText}>Modifier le mot de passe</Text>
+          <Text style={styles.primaryText}>{t('auth.changePassword')}</Text>
         </Pressable>
         {status ? <Text style={[styles.status, { color: theme.muted }]}>{status}</Text> : null}
       </View>

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { BrandHeader, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
@@ -15,6 +16,7 @@ function normalizeUsername(value: string) {
 }
 
 export default function UsernameScreen() {
+  const { t } = useTranslation();
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
   const { firstName: firstNameParam } = useLocalSearchParams<{ firstName?: string }>();
@@ -32,12 +34,12 @@ export default function UsernameScreen() {
     const cleanUsername = normalizeUsername(username);
 
     if (cleanUsername && !/^[a-z0-9._]{3,32}$/.test(cleanUsername)) {
-      setStatus('Utilise 3 a 32 caracteres en minuscules, sans espaces.');
+      setStatus(t('errors.invalidUsername'));
       return;
     }
 
     try {
-      setStatus('Reservation du nom utilisateur...');
+      setStatus(t('status.reservingUsername'));
       const result = await authApi.completeUsername({
         username: cleanUsername || undefined,
         firstName: firstName || user.displayName,
@@ -50,28 +52,25 @@ export default function UsernameScreen() {
       router.replace('/onboarding');
     } catch (error) {
       if (error instanceof ApiError && error.code === 'username_taken') {
-        setStatus('Ce nom utilisateur est deja pris. Essaie une autre version.');
+        setStatus(t('errors.usernameTaken'));
         return;
       }
 
-      setStatus(error instanceof ApiError ? error.message : 'Impossible de confirmer ce nom utilisateur.');
+      setStatus(error instanceof ApiError ? error.message : t('errors.usernameFailed'));
     }
   }
 
   return (
     <ScreenShell theme={theme}>
-      <BrandHeader theme={theme} badgeText="Nom utilisateur" badgeIcon="@" />
-      <SectionLabel theme={theme} label="Identifiant unique" />
+      <BrandHeader theme={theme} badgeText={t('auth.usernameBadge')} badgeIcon="@" />
+      <SectionLabel theme={theme} label={t('auth.uniqueIdentifier')} />
 
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <View style={[styles.iconCircle, { backgroundColor: theme.accentSoft }]}>
           <Ionicons name="at-outline" size={34} color={theme.accentStrong} />
         </View>
-        <Text style={[styles.title, { color: theme.text }]}>Choisis ton @username</Text>
-        <Text style={[styles.copy, { color: theme.muted }]}>
-          Il sera unique, en minuscules et sans espaces. Tu peux laisser le champ vide pour utiliser
-          automatiquement ton prenom.
-        </Text>
+        <Text style={[styles.title, { color: theme.text }]}>{t('auth.chooseUsername')}</Text>
+        <Text style={[styles.copy, { color: theme.muted }]}>{t('auth.usernameHelp')}</Text>
 
         <View style={[styles.usernameField, { backgroundColor: theme.surfaceAlt }]}>
           <Text style={[styles.atSign, { color: theme.accentStrong }]}>@</Text>
@@ -86,7 +85,7 @@ export default function UsernameScreen() {
         </View>
 
         <Pressable onPress={continueOnboarding} style={[styles.primary, { backgroundColor: theme.accentStrong }]}>
-          <Text style={styles.primaryText}>Continuer</Text>
+          <Text style={styles.primaryText}>{t('common.continue')}</Text>
         </Pressable>
         {status ? <Text style={[styles.status, { color: theme.muted }]}>{status}</Text> : null}
       </View>

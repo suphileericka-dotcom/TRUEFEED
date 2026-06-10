@@ -1,6 +1,7 @@
 import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { BrandHeader, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
@@ -8,6 +9,7 @@ import { useGlobalSeason } from '@/hooks/use-global-season';
 import { authApi } from '@/services/api/auth';
 
 export default function ForgotScreen() {
+  const { t } = useTranslation();
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
   const [email, setEmail] = useState('');
@@ -15,38 +17,38 @@ export default function ForgotScreen() {
 
   async function sendResetLink() {
     try {
-      setStatus('Envoi du lien...');
+      setStatus(t('status.sendingLink'));
       await authApi.forgotPassword({ email: email.trim().toLowerCase() });
-      setStatus('Si un compte existe avec cet email, un lien vient d etre envoye.');
+      setStatus(t('status.resetSent'));
     } catch {
-      setStatus('Impossible d envoyer le lien pour le moment.');
+      setStatus(t('common.error'));
     }
   }
 
   return (
     <ScreenShell theme={theme}>
-      <BrandHeader theme={theme} badgeText="Recuperation" badgeIcon="?" />
-      <SectionLabel theme={theme} label="Securite compte" />
+      <BrandHeader theme={theme} badgeText={t('auth.forgotBadge')} badgeIcon="?" />
+      <SectionLabel theme={theme} label={t('auth.securityAccount')} />
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.title, { color: theme.text }]}>Retrouver acces</Text>
+        <Text style={[styles.title, { color: theme.text }]}>{t('auth.recoverAccess')}</Text>
         <Text style={[styles.copy, { color: theme.muted }]}>
-          Entre ton email et TRUEFEED preparera le parcours de reinitialisation.
+          {t('auth.forgotCopy')}
         </Text>
         <TextInput
           autoCapitalize="none"
           keyboardType="email-address"
           onChangeText={setEmail}
-          placeholder="Email"
+          placeholder={t('common.email')}
           placeholderTextColor={theme.muted}
           style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
           value={email}
         />
         <Pressable onPress={sendResetLink} style={[styles.primary, { backgroundColor: theme.accentStrong }]}>
-          <Text style={styles.primaryText}>Envoyer le lien</Text>
+          <Text style={styles.primaryText}>{t('common.sendLink')}</Text>
         </Pressable>
         {status ? <Text style={[styles.status, { color: theme.muted }]}>{status}</Text> : null}
         <Link href="/login">
-          <Text style={[styles.linkText, { color: theme.accentStrong }]}>Retour connexion</Text>
+          <Text style={[styles.linkText, { color: theme.accentStrong }]}>{t('auth.backToLogin')}</Text>
         </Link>
       </View>
     </ScreenShell>

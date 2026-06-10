@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ScreenShell } from '@/components/truefeed/ui';
 import { getGoodTipVisual } from '@/constants/good-tip-visuals';
 import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { useTranslatedText } from '@/hooks/use-translated-text';
 import { goodTipsApi } from '@/services/api/good-tips';
 
 type Plan = {
@@ -53,6 +55,7 @@ const initialPlans: Plan[] = [
 ];
 
 function TipVisual({ visualKey }: { visualKey: string }) {
+  const { t } = useTranslation();
   const visual = getGoodTipVisual(visualKey);
 
   return (
@@ -62,12 +65,65 @@ function TipVisual({ visualKey }: { visualKey: string }) {
       <View style={[styles.visualIconCircle, { backgroundColor: visual.accentColor }]}>
         <Ionicons name={visual.icon} size={54} color={visual.shapeColor} />
       </View>
-      <Text style={styles.visualLabel}>{visual.label}</Text>
+      <Text style={styles.visualLabel}>{t(`bonplan.visuals.${visual.key}`, { defaultValue: visual.label })}</Text>
+    </View>
+  );
+}
+
+function PlanCard({
+  plan,
+  theme,
+}: {
+  plan: Plan;
+  theme: (typeof seasonThemes)['summer'];
+}) {
+  const { t } = useTranslation();
+  const translatedPlace = useTranslatedText(plan.place);
+  const translatedAddress = useTranslatedText(plan.address);
+  const translatedCategory = useTranslatedText(plan.category);
+  const translatedTransport = useTranslatedText(plan.transport);
+
+  return (
+    <View
+      style={[styles.planCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+    >
+      <TipVisual visualKey={plan.visualKey} />
+      <View style={styles.planBody}>
+        <View style={styles.planTitleRow}>
+          <View style={styles.planTitleBlock}>
+            <Text style={[styles.planTitle, { color: theme.text }]}>{translatedPlace}</Text>
+            <Text style={[styles.planCategory, { color: theme.accentStrong }]}>
+              {translatedCategory}
+            </Text>
+          </View>
+          <View style={[styles.ratingPill, { backgroundColor: theme.accentSoft }]}>
+            <Text style={[styles.ratingText, { color: theme.accentStrong }]}>{plan.rating}</Text>
+          </View>
+        </View>
+        <View style={styles.planDetailRow}>
+          <Ionicons name="location-outline" size={17} color={theme.muted} />
+          <Text style={[styles.planDetailText, { color: theme.muted }]}>{translatedAddress}</Text>
+        </View>
+        <View style={styles.planFacts}>
+          <View style={[styles.factPill, { backgroundColor: theme.surfaceAlt }]}>
+            <Ionicons name="cash-outline" size={16} color={theme.accentStrong} />
+            <Text style={[styles.factText, { color: theme.text }]}>{plan.budget}</Text>
+          </View>
+          <View style={[styles.factPill, { backgroundColor: theme.surfaceAlt }]}>
+            <Ionicons name="navigate-outline" size={16} color={theme.accentStrong} />
+            <Text style={[styles.factText, { color: theme.text }]}>{translatedTransport}</Text>
+          </View>
+        </View>
+        <Text style={[styles.planAuthor, { color: theme.muted }]}>
+          {t('bonplan.by')} {plan.author}
+        </Text>
+      </View>
     </View>
   );
 }
 
 export default function BonPlanScreen() {
+  const { t } = useTranslation();
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
   const [plans, setPlans] = useState<Plan[]>(initialPlans);
@@ -82,8 +138,8 @@ export default function BonPlanScreen() {
           setPlans(
             response.items.map((tip) => ({
               place: tip.place,
-              address: tip.address || 'Adresse non renseignee',
-              category: tip.category || 'Bon plan',
+              address: tip.address || t('bonplan.addressMissing'),
+              category: tip.category || t('bonplan.title'),
               visualKey: tip.visualKey || 'generic',
               budget: tip.budget,
               transport: tip.transport,
@@ -94,54 +150,25 @@ export default function BonPlanScreen() {
         }
       })
       .catch(() => undefined);
-  }, []);
+  }, [t]);
 
   return (
     <ScreenShell theme={theme}>
       <View style={[styles.headerCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.title, { color: theme.text }]}>Bon Plan</Text>
+        <Text style={[styles.title, { color: theme.text }]}>{t('bonplan.title')}</Text>
         <View style={[styles.heroPanel, { backgroundColor: theme.accentStrong }]}>
           <Text style={styles.heroNumber}>{sharedCount}</Text>
-          <Text style={styles.heroText}>spots recommandes par la communaute</Text>
+          <Text style={styles.heroText}>{t('bonplan.hero')}</Text>
         </View>
       </View>
 
-      <Text style={[styles.sectionTitle, { color: theme.text }]}>Lieux proches</Text>
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('bonplan.nearby')}</Text>
       {sortedPlans.map((plan) => (
-        <View
+        <PlanCard
           key={`${plan.place}-${plan.author}-${plan.address}`}
-          style={[styles.planCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
-        >
-          <TipVisual visualKey={plan.visualKey} />
-          <View style={styles.planBody}>
-            <View style={styles.planTitleRow}>
-              <View style={styles.planTitleBlock}>
-                <Text style={[styles.planTitle, { color: theme.text }]}>{plan.place}</Text>
-                <Text style={[styles.planCategory, { color: theme.accentStrong }]}>
-                  {plan.category}
-                </Text>
-              </View>
-              <View style={[styles.ratingPill, { backgroundColor: theme.accentSoft }]}>
-                <Text style={[styles.ratingText, { color: theme.accentStrong }]}>{plan.rating}</Text>
-              </View>
-            </View>
-            <View style={styles.planDetailRow}>
-              <Ionicons name="location-outline" size={17} color={theme.muted} />
-              <Text style={[styles.planDetailText, { color: theme.muted }]}>{plan.address}</Text>
-            </View>
-            <View style={styles.planFacts}>
-              <View style={[styles.factPill, { backgroundColor: theme.surfaceAlt }]}>
-                <Ionicons name="cash-outline" size={16} color={theme.accentStrong} />
-                <Text style={[styles.factText, { color: theme.text }]}>{plan.budget}</Text>
-              </View>
-              <View style={[styles.factPill, { backgroundColor: theme.surfaceAlt }]}>
-                <Ionicons name="navigate-outline" size={16} color={theme.accentStrong} />
-                <Text style={[styles.factText, { color: theme.text }]}>{plan.transport}</Text>
-              </View>
-            </View>
-            <Text style={[styles.planAuthor, { color: theme.muted }]}>par {plan.author}</Text>
-          </View>
-        </View>
+          plan={plan}
+          theme={theme}
+        />
       ))}
     </ScreenShell>
   );

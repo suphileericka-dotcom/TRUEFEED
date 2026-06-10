@@ -1,6 +1,7 @@
 import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { BrandHeader, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
@@ -10,6 +11,7 @@ import { authApi } from '@/services/api/auth';
 import { ApiError } from '@/services/api/client';
 
 export default function LoginScreen() {
+  const { t } = useTranslation();
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
   const { signIn } = useSession();
@@ -19,38 +21,38 @@ export default function LoginScreen() {
 
   async function login() {
     try {
-      setStatus('Connexion...');
+      setStatus(t('common.loading'));
       const result = await authApi.login({ email: email.trim().toLowerCase(), password });
       signIn(result);
       router.replace('/(tabs)');
     } catch (error) {
-      setStatus(error instanceof ApiError ? error.message : 'Email ou mot de passe incorrect.');
+      setStatus(error instanceof ApiError ? error.message : t('common.error'));
     }
   }
 
   return (
     <ScreenShell theme={theme}>
-      <BrandHeader theme={theme} badgeText="Connexion" badgeIcon={theme.emoji} />
-      <SectionLabel theme={theme} label="Compte TRUEFEED" />
+      <BrandHeader theme={theme} badgeText={t('auth.loginBadge')} badgeIcon={theme.emoji} />
+      <SectionLabel theme={theme} label={t('auth.accountLabel')} />
 
       <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.title, { color: theme.text }]}>Bon retour</Text>
+        <Text style={[styles.title, { color: theme.text }]}>{t('auth.welcomeBack')}</Text>
         <Text style={[styles.copy, { color: theme.muted }]}>
-          Connecte-toi pour publier, commenter et retrouver tes espaces.
+          {t('auth.loginCopy')}
         </Text>
 
         <TextInput
           autoCapitalize="none"
           keyboardType="email-address"
           onChangeText={setEmail}
-          placeholder="Email"
+          placeholder={t('common.email')}
           placeholderTextColor={theme.muted}
           style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
           value={email}
         />
         <TextInput
           onChangeText={setPassword}
-          placeholder="Mot de passe"
+          placeholder={t('common.password')}
           placeholderTextColor={theme.muted}
           secureTextEntry
           style={[styles.input, { backgroundColor: theme.surfaceAlt, color: theme.text }]}
@@ -58,7 +60,7 @@ export default function LoginScreen() {
         />
         <Link href="/forgot">
           <Text style={[styles.forgotLink, { color: theme.accentStrong }]}>
-            Mot de passe oublie ?
+            {t('auth.forgotPassword')}
           </Text>
         </Link>
 
@@ -66,14 +68,14 @@ export default function LoginScreen() {
           onPress={login}
           style={[styles.primary, { backgroundColor: theme.accentStrong }]}
         >
-          <Text style={styles.primaryText}>Se connecter</Text>
+          <Text style={styles.primaryText}>{t('auth.login')}</Text>
         </Pressable>
 
         {status ? <Text style={[styles.status, { color: theme.muted }]}>{status}</Text> : null}
 
         <View style={styles.links}>
           <Link href="/signup">
-            <Text style={[styles.linkText, { color: theme.accentStrong }]}>Creer un compte</Text>
+            <Text style={[styles.linkText, { color: theme.accentStrong }]}>{t('auth.createAccount')}</Text>
           </Link>
         </View>
       </View>
