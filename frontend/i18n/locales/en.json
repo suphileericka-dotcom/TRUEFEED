@@ -158,7 +158,10 @@
     "publishTextFailed": "Unable to publish this text right now.",
     "publishMediaFailed": "Media selected. Sending to the feed is unavailable right now.",
     "publishTipFailed": "Unable to publish this good deal right now.",
-    "publishStoryFailed": "Unable to publish this story right now."
+    "publishStoryFailed": "Unable to publish this story right now.",
+    "imageTooLarge": "Photo must be 10 MB maximum.",
+    "videoTooLarge": "Video must be 50 MB maximum.",
+    "videoTooLong": "Video must be 60 seconds maximum."
   },
   "status": {
     "creatingAccount": "Creating account...",
@@ -171,7 +174,9 @@
     "reservingUsername": "Reserving username...",
     "changingPassword": "Changing password...",
     "shareReady": "Share ready",
-    "linkReadyToShare": "Link ready to share"
+    "linkReadyToShare": "Link ready to share",
+    "uploadingMedia": "Uploading media...",
+    "publishingMedia": "Publishing post..."
   },
   "gifts": {
     "welcomeTitle": "Welcome gift",

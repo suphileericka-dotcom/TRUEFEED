@@ -12,6 +12,9 @@ const env = {
   databaseUrl: process.env.DATABASE_URL,
   resendApiKey: process.env.RESEND_API_KEY,
   mailFrom: process.env.MAIL_FROM || 'TRUEFEED <onboarding@resend.dev>',
+  cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME,
+  cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
+  cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,
   trustProxy: process.env.TRUST_PROXY === 'true',
   vercelProjectHostPatterns: [
     /^truefeed(?:-[a-z0-9-]+)?\.vercel\.app$/i,

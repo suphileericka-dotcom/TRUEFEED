@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import type { Socket } from 'socket.io-client';
 
 import { BrandHeader, Chip, TruefeedModal } from '@/components/truefeed/ui';
@@ -31,6 +32,7 @@ type FeedPost = {
   location: string;
   title: string;
   caption: string;
+  mediaUrl?: string | null;
   mediaType: 'image' | 'video' | 'text';
   format: 'vlog' | 'photo' | 'tip' | 'debate';
   visual: string;
@@ -133,6 +135,7 @@ function mapApiPost(post: ApiFeedPost): FeedPost {
     location: post.location || 'TRUEFEED',
     title: post.title || tag,
     caption: post.caption,
+    mediaUrl: post.mediaUrl,
     mediaType: post.mediaType,
     format: post.format,
     visual: post.location?.slice(0, 10).toUpperCase() || tag.toUpperCase(),
@@ -215,6 +218,18 @@ const FeedCard = memo(function FeedCard({
   const [shareNotice, setShareNotice] = useState('');
   const likesCount = liked ? post.likes + 1 : post.likes;
   const sharesCount = shared ? post.shares + 1 : post.shares;
+  const videoPlayer = useVideoPlayer(post.mediaUrl && post.mediaType === 'video' ? post.mediaUrl : '', (player) => {
+    player.loop = true;
+    player.muted = true;
+    if (post.mediaUrl && post.mediaType === 'video') {
+      player.play();
+    }
+  });
+  const [videoMuted, setVideoMuted] = useState(true);
+
+  useEffect(() => {
+    videoPlayer.muted = videoMuted;
+  }, [videoMuted, videoPlayer]);
 
   return (
     <Pressable
@@ -230,8 +245,19 @@ const FeedCard = memo(function FeedCard({
       </View>
 
       <View style={[styles.visual, { backgroundColor: theme.accentStrong }]}>
+        {post.mediaUrl && post.mediaType === 'image' ? (
+          <Image source={{ uri: post.mediaUrl }} style={styles.feedMedia} />
+        ) : null}
+        {post.mediaUrl && post.mediaType === 'video' ? (
+          <Pressable onPress={() => setVideoMuted((value) => !value)} style={styles.feedMediaWrap}>
+            <VideoView player={videoPlayer} style={styles.feedMedia} contentFit="cover" nativeControls={false} />
+            <View style={styles.soundBadge}>
+              <Ionicons name={videoMuted ? 'volume-mute' : 'volume-high'} size={16} color="#FFFFFF" />
+            </View>
+          </Pressable>
+        ) : null}
         <Chip label={post.tag} backgroundColor="rgba(255,255,255,0.22)" textColor="#FFFFFF" />
-        <Text style={styles.visualText}>{post.visual}</Text>
+        {!post.mediaUrl ? <Text style={styles.visualText}>{post.visual}</Text> : null}
         <View style={styles.mediaBadge}>
           <Ionicons
             name={
@@ -1163,6 +1189,25 @@ const styles = StyleSheet.create({
   authorName: { fontFamily: fonts.body, fontSize: 18, fontWeight: '800' },
   metaText: { fontFamily: fonts.body, fontSize: 14, marginTop: 4 },
   visual: { gap: 16, height: 330, padding: 18 },
+  feedMediaWrap: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  feedMedia: {
+    ...StyleSheet.absoluteFillObject,
+    height: '100%',
+    width: '100%',
+  },
+  soundBadge: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.42)',
+    borderRadius: 16,
+    bottom: 14,
+    height: 32,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 14,
+    width: 32,
+  },
   visualText: {
     alignSelf: 'center',
     color: '#FFFFFF',

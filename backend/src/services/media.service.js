@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { v2: cloudinary } = require('cloudinary');
 
 const {
   CompleteMultipartUploadCommand,
@@ -13,6 +14,9 @@ const { createHttpError } = require('../utils/httpError');
 
 const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/quicktime'];
 const maxSizeBytes = 100 * 1024 * 1024;
+const maxImageSizeBytes = 10 * 1024 * 1024;
+const maxVideoSizeBytes = 50 * 1024 * 1024;
+const maxVideoDurationSeconds = 60;
 const multipartThresholdBytes = 20 * 1024 * 1024;
 const multipartPartSizeBytes = 10 * 1024 * 1024;
 
@@ -69,6 +73,94 @@ function validateMediaPayload(payload = {}) {
   }
 
   return { contentType, sizeBytes };
+}
+
+function configureCloudinary() {
+  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    throw createHttpError(
+      500,
+      'cloudinary_not_configured',
+      'Cloudinary n est pas configure sur le serveur.',
+    );
+  }
+
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+}
+
+function validateUploadFile(file, payload = {}) {
+  if (!file) {
+    throw createHttpError(400, 'media_file_required', 'Fichier media requis.');
+  }
+
+  if (!allowedTypes.includes(file.mimetype)) {
+    throw createHttpError(400, 'invalid_media_type', 'Type media non supporte.');
+  }
+
+  const mediaType = file.mimetype.startsWith('video/') ? 'video' : 'image';
+  const maxSize = mediaType === 'video' ? maxVideoSizeBytes : maxImageSizeBytes;
+  const durationSeconds = Number(payload.durationSeconds || payload.duration || 0);
+
+  if (file.size > maxSize) {
+    throw createHttpError(
+      400,
+      'media_too_large',
+      mediaType === 'video' ? 'La video doit faire 50 Mo maximum.' : 'La photo doit faire 10 Mo maximum.',
+      { maxSizeBytes: maxSize },
+    );
+  }
+
+  if (mediaType === 'video' && durationSeconds > maxVideoDurationSeconds) {
+    throw createHttpError(400, 'video_too_long', 'La video doit durer 60 secondes maximum.', {
+      maxDurationSeconds: maxVideoDurationSeconds,
+    });
+  }
+
+  return { mediaType, durationSeconds };
+}
+
+function uploadBufferToCloudinary(file, { mediaType, user }) {
+  configureCloudinary();
+
+  return new Promise((resolve, reject) => {
+    const upload = cloudinary.uploader.upload_stream(
+      {
+        folder: `truefeed/${user.id}/posts`,
+        resource_type: mediaType === 'video' ? 'video' : 'image',
+        quality: 'auto',
+        fetch_format: 'auto',
+      },
+      (error, result) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve(result);
+      },
+    );
+
+    upload.end(file.buffer);
+  });
+}
+
+async function uploadMedia(file, payload = {}, user) {
+  const validation = validateUploadFile(file, payload);
+  const result = await uploadBufferToCloudinary(file, { ...validation, user });
+
+  return {
+    id: result.public_id,
+    url: result.secure_url,
+    mediaType: validation.mediaType,
+    sizeBytes: file.size,
+    durationSeconds: result.duration || validation.durationSeconds || null,
+    width: result.width || null,
+    height: result.height || null,
+    provider: 'cloudinary',
+  };
 }
 
 async function createSingleUpload({ bucket, key, contentType, sizeBytes }) {
@@ -177,5 +269,6 @@ module.exports = {
   mediaService: {
     completeMultipartUpload,
     createPresignedUpload,
+    uploadMedia,
   },
 };

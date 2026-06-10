@@ -158,7 +158,10 @@
     "publishTextFailed": "Impossible de publier ce texte pour le moment.",
     "publishMediaFailed": "Media selectionne. Envoi au feed indisponible pour le moment.",
     "publishTipFailed": "Impossible de publier ce bon plan pour le moment.",
-    "publishStoryFailed": "Impossible de publier cette story pour le moment."
+    "publishStoryFailed": "Impossible de publier cette story pour le moment.",
+    "imageTooLarge": "La photo doit faire 10 Mo maximum.",
+    "videoTooLarge": "La video doit faire 50 Mo maximum.",
+    "videoTooLong": "La video doit durer 60 secondes maximum."
   },
   "status": {
     "creatingAccount": "Création du compte...",
@@ -171,7 +174,9 @@
     "reservingUsername": "Reservation du nom utilisateur...",
     "changingPassword": "Modification du mot de passe...",
     "shareReady": "Partage pret",
-    "linkReadyToShare": "Lien pret a partager"
+    "linkReadyToShare": "Lien pret a partager",
+    "uploadingMedia": "Upload du media...",
+    "publishingMedia": "Publication du post..."
   },
   "gifts": {
     "welcomeTitle": "Cadeau de bienvenue",

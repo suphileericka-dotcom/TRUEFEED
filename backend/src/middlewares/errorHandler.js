@@ -8,6 +8,14 @@ function notFoundHandler(req, res) {
 }
 
 function errorHandler(error, req, res, _next) {
+  if (error.code === 'LIMIT_FILE_SIZE') {
+    res.status(400).json({
+      error: 'media_too_large',
+      message: 'Le media est trop volumineux.',
+    });
+    return;
+  }
+
   if (error.statusCode) {
     res.status(error.statusCode).json({
       error: error.error || 'request_error',

@@ -5,6 +5,7 @@ export type CreatePostPayload = {
   caption: string;
   mediaUrl?: string;
   mediaType: 'image' | 'video' | 'text';
+  mediaSizeBytes?: number;
   format: 'vlog' | 'photo' | 'tip' | 'debate';
   location?: string;
   season?: 'spring' | 'summer' | 'autumn' | 'winter';

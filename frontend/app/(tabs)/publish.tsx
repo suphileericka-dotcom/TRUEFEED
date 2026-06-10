@@ -1,20 +1,53 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { VideoView, useVideoPlayer } from 'expo-video';
 
 import { BrandHeader, MediaSelector, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, publishMediaOptions, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 import { useSession } from '@/hooks/use-session';
 import { goodTipsApi } from '@/services/api/good-tips';
+import { mediaApi } from '@/services/api/media';
 import { postsApi } from '@/services/api/posts';
 
 type MediaKey = (typeof publishMediaOptions)[number]['key'];
 type PublishMode = 'normal' | 'text' | 'media' | 'tip';
 
 const maxTextLength = 2200;
+const maxImageSizeBytes = 10 * 1024 * 1024;
+const maxVideoSizeBytes = 50 * 1024 * 1024;
+const maxVideoDurationMs = 60 * 1000;
+
+type SelectedMediaAsset = {
+  uri: string;
+  fileName?: string | null;
+  fileSize?: number | null;
+  mimeType?: string | null;
+  duration?: number | null;
+};
+
+function MediaPreview({ asset, mediaType }: { asset: SelectedMediaAsset | null; mediaType: MediaKey }) {
+  const player = useVideoPlayer(asset?.uri || '', (videoPlayer) => {
+    videoPlayer.loop = true;
+    videoPlayer.muted = true;
+    if (asset?.uri && mediaType === 'video') {
+      videoPlayer.play();
+    }
+  });
+
+  if (!asset) {
+    return null;
+  }
+
+  if (mediaType === 'video') {
+    return <VideoView player={player} style={styles.selectedMediaPreview} nativeControls contentFit="cover" />;
+  }
+
+  return <Image source={{ uri: asset.uri }} style={styles.selectedMediaPreview} />;
+}
 
 export default function PublishScreen() {
   const { t } = useTranslation();
@@ -23,7 +56,7 @@ export default function PublishScreen() {
   const theme = seasonThemes[selectedSeason];
   const [mode, setMode] = useState<PublishMode>('normal');
   const [mediaType, setMediaType] = useState<MediaKey>('image');
-  const [selectedMediaUri, setSelectedMediaUri] = useState<string | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<SelectedMediaAsset | null>(null);
   const [caption, setCaption] = useState('');
   const [place, setPlace] = useState('');
   const [address, setAddress] = useState('');
@@ -31,10 +64,12 @@ export default function PublishScreen() {
   const [budget, setBudget] = useState('');
   const [transport, setTransport] = useState('');
   const [status, setStatus] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
 
   const activeMedia = publishMediaOptions.find((item) => item.key === mediaType);
   const canPublishText = caption.trim().length >= 2;
-  const canPublishMedia = Boolean(selectedMediaUri);
+  const canPublishMedia = Boolean(selectedMedia) && !isUploading;
   const canPublishTip =
     place.trim().length >= 2 &&
     address.trim().length >= 4 &&
@@ -53,7 +88,7 @@ export default function PublishScreen() {
   function resetDraft() {
     setMode('normal');
     setMediaType('image');
-    setSelectedMediaUri(null);
+    setSelectedMedia(null);
     setCaption('');
     setPlace('');
     setAddress('');
@@ -61,13 +96,15 @@ export default function PublishScreen() {
     setBudget('');
     setTransport('');
     setStatus('');
+    setUploadProgress(0);
+    setIsUploading(false);
   }
 
   async function pickMedia(nextMediaType: MediaKey) {
     if (nextMediaType === 'text') {
       setMode('text');
       setMediaType('text');
-      setSelectedMediaUri(null);
+      setSelectedMedia(null);
       setCaption('');
       setStatus('');
       return;
@@ -89,8 +126,33 @@ export default function PublishScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      const fileSize = asset.fileSize || 0;
+      const duration = asset.duration || 0;
+
+      if (nextMediaType === 'image' && fileSize > maxImageSizeBytes) {
+        setStatus(t('errors.imageTooLarge'));
+        return;
+      }
+
+      if (nextMediaType === 'video' && fileSize > maxVideoSizeBytes) {
+        setStatus(t('errors.videoTooLarge'));
+        return;
+      }
+
+      if (nextMediaType === 'video' && duration > maxVideoDurationMs) {
+        setStatus(t('errors.videoTooLong'));
+        return;
+      }
+
       setMediaType(nextMediaType);
-      setSelectedMediaUri(result.assets[0].uri);
+      setSelectedMedia({
+        uri: asset.uri,
+        fileName: asset.fileName,
+        fileSize: asset.fileSize,
+        mimeType: asset.mimeType,
+        duration: asset.duration,
+      });
       setMode('media');
       setCaption('');
       setStatus('');
@@ -121,16 +183,27 @@ export default function PublishScreen() {
   }
 
   async function publishMedia() {
-    if (!canPublishMedia || !requireAuth()) {
+    if (!selectedMedia || !canPublishMedia || !requireAuth()) {
       return;
     }
 
     try {
+      setIsUploading(true);
+      setUploadProgress(0.03);
+      setStatus(t('status.uploadingMedia'));
+      const uploaded = await mediaApi.upload(
+        selectedMedia,
+        mediaType === 'video' ? 'video' : 'image',
+        setUploadProgress,
+      );
+
+      setStatus(t('status.publishingMedia'));
       await postsApi.create(
         {
           caption: caption.trim() || t('publish.mediaPostFallback'),
           mediaType: mediaType === 'video' ? 'video' : 'image',
-          mediaUrl: 'https://truefeed-production.up.railway.app/media-placeholder',
+          mediaUrl: uploaded.media.url,
+          mediaSizeBytes: uploaded.media.sizeBytes,
           format: mediaType === 'video' ? 'vlog' : 'photo',
           season: selectedSeason,
           tags: [],
@@ -139,8 +212,9 @@ export default function PublishScreen() {
       );
       resetDraft();
       router.push('/(tabs)');
-    } catch {
-      setStatus(t('errors.publishMediaFailed'));
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : t('errors.publishMediaFailed'));
+      setIsUploading(false);
     }
   }
 
@@ -228,8 +302,13 @@ export default function PublishScreen() {
             </View>
           </View>
           <View style={styles.mediaPreview}>
-            <Ionicons name={activeMedia?.icon ?? 'image-outline'} size={58} color="#FFFFFF" />
-            <Text style={styles.mediaPreviewText}>{t('publish.mediaReady')}</Text>
+            <MediaPreview asset={selectedMedia} mediaType={mediaType} />
+            {!selectedMedia ? (
+              <>
+                <Ionicons name={activeMedia?.icon ?? 'image-outline'} size={58} color="#FFFFFF" />
+                <Text style={styles.mediaPreviewText}>{t('publish.mediaReady')}</Text>
+              </>
+            ) : null}
           </View>
         </View>
 
@@ -257,6 +336,11 @@ export default function PublishScreen() {
             {t('common.publish')}
           </Text>
         </Pressable>
+        {isUploading ? (
+          <View style={[styles.progressTrack, { backgroundColor: theme.surfaceAlt }]}>
+            <View style={[styles.progressFill, { width: `${Math.round(uploadProgress * 100)}%`, backgroundColor: theme.accentStrong }]} />
+          </View>
+        ) : null}
         {status ? <Text style={[styles.statusText, { color: theme.muted }]}>{status}</Text> : null}
       </ScreenShell>
     );
@@ -420,12 +504,27 @@ const styles = StyleSheet.create({
     gap: 10,
     justifyContent: 'center',
     minHeight: 170,
+    overflow: 'hidden',
   },
   mediaPreviewText: {
     color: '#FFFFFF',
     fontFamily: fonts.body,
     fontSize: 15,
     fontWeight: '800',
+  },
+  selectedMediaPreview: {
+    borderRadius: 18,
+    height: '100%',
+    width: '100%',
+  },
+  progressTrack: {
+    borderRadius: 999,
+    height: 8,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    borderRadius: 999,
+    height: '100%',
   },
   tipShortcut: {
     alignItems: 'center',
