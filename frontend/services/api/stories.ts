@@ -8,6 +8,7 @@ export type Story = {
   text: string | null;
   mediaType: 'image' | 'video' | null;
   mediaUrl: string | null;
+  durationMs?: number | null;
   backgroundColor: string;
   viewsCount: number;
   createdAt: string;
@@ -20,6 +21,7 @@ export type StoryViewer = {
   displayName: string;
   viewedAt: string;
   online: boolean;
+  lastSeenAt?: string | null;
 };
 
 export const storiesApi = {
@@ -31,6 +33,7 @@ export const storiesApi = {
     text?: string;
     mediaType?: 'image' | 'video';
     mediaUrl?: string;
+    durationMs?: number;
     backgroundColor: string;
   }) {
     return apiClient.post<{ story: Story }, typeof payload>('/api/v1/stories', payload);

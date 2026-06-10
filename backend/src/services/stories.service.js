@@ -10,6 +10,7 @@ function toStory(row) {
     text: row.text,
     mediaType: row.media_type,
     mediaUrl: row.media_url,
+    durationMs: row.duration_ms,
     backgroundColor: row.background_color,
     viewsCount: Number(row.views_count || 0),
     createdAt: row.created_at,
@@ -24,6 +25,7 @@ function toViewer(row) {
     displayName: row.viewer_display_name,
     viewedAt: row.viewed_at,
     online: Boolean(row.online),
+    lastSeenAt: row.viewer_last_seen_at,
   };
 }
 
@@ -52,6 +54,7 @@ async function createStory(payload, user) {
   const text = String(payload.text || '').trim();
   const mediaType = payload.mediaType || null;
   const mediaUrl = payload.mediaUrl || null;
+  const durationMs = payload.durationMs ? Math.max(Number(payload.durationMs), 1000) : null;
   const backgroundColor = payload.backgroundColor || '#111827';
 
   if (!text && !mediaType && !mediaUrl) {
@@ -63,13 +66,22 @@ async function createStory(payload, user) {
   }
 
   const result = await query(
-    `INSERT INTO stories (author_id, text, media_type, media_url, background_color)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO stories (author_id, text, media_type, media_url, duration_ms, background_color)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *,
-       $6::TEXT AS author_username,
-       $7::TEXT AS author_display_name,
+       $7::TEXT AS author_username,
+       $8::TEXT AS author_display_name,
        0::INTEGER AS views_count`,
-    [user.id, text || null, mediaType, mediaUrl, backgroundColor, user.username, user.displayName],
+    [
+      user.id,
+      text || null,
+      mediaType,
+      mediaUrl,
+      durationMs,
+      backgroundColor,
+      user.username,
+      user.displayName,
+    ],
   );
 
   return toStory(result.rows[0]);
@@ -139,6 +151,7 @@ async function getStory(storyId) {
             story_views.viewed_at,
             users.username AS viewer_username,
             users.display_name AS viewer_display_name,
+            users.last_seen_at AS viewer_last_seen_at,
             users.last_seen_at > now() - interval '2 minutes' AS online
      FROM story_views
      INNER JOIN users ON users.id = story_views.viewer_id

@@ -30,6 +30,18 @@ io.on('connection', (socket) => {
       socket.join(`user:${userId}`);
     }
   });
+
+  socket.on('stories:join', (storyId) => {
+    if (storyId) {
+      socket.join(`story:${storyId}`);
+    }
+  });
+
+  socket.on('stories:leave', (storyId) => {
+    if (storyId) {
+      socket.leave(`story:${storyId}`);
+    }
+  });
 });
 
 app.set('io', io);

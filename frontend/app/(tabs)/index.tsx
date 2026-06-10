@@ -3,6 +3,8 @@ import { router } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
+  Image,
+  Modal,
   Pressable,
   ScrollView,
   Share,
@@ -12,8 +14,10 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import type { Socket } from 'socket.io-client';
 
 import { BrandHeader, Chip, TruefeedModal } from '@/components/truefeed/ui';
+import { env } from '@/constants/env';
 import { feedBySeason, fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 import { useSession } from '@/hooks/use-session';
@@ -44,14 +48,7 @@ type FeedItem = FeedPost & {
 const FEED_BATCH_SIZE = 10;
 const PREFETCH_DISTANCE = 3;
 const REFRESH_INTERVAL_MS = 30 * 1000;
-
-const storyProfiles = [
-  { name: 'Lucas', avatar: 'L', colors: ['#F9CE34', '#EE2A7B'] },
-  { name: 'Sara', avatar: 'S', colors: ['#F9CE34', '#6228D7'] },
-  { name: 'Karim', avatar: 'K', colors: ['#F9CE34', '#EE2A7B'] },
-  { name: 'Yuna', avatar: 'Y', colors: ['#F9CE34', '#6228D7'] },
-  { name: 'Alex', avatar: 'A', colors: ['#F9CE34', '#EE2A7B'] },
-];
+const DEFAULT_STORY_DURATION_MS = 5000;
 
 const storyBackgrounds = ['#111827', '#EE2A7B', '#F97316', '#14B8A6', '#2563EB', '#7C3AED'];
 
@@ -151,6 +148,55 @@ function uniqueIncomingPosts(incoming: FeedPost[], current: FeedItem[]) {
   const currentIds = new Set(current.map((post) => post.id));
 
   return incoming.filter((post) => !currentIds.has(post.id));
+}
+
+type StoryGroup = {
+  authorId: string;
+  author: string;
+  authorName: string;
+  stories: Story[];
+};
+
+function groupStoriesByAuthor(stories: Story[]) {
+  const groups = new Map<string, StoryGroup>();
+
+  stories.forEach((story) => {
+    const existing = groups.get(story.authorId);
+
+    if (existing) {
+      existing.stories.push(story);
+      return;
+    }
+
+    groups.set(story.authorId, {
+      authorId: story.authorId,
+      author: story.author,
+      authorName: story.authorName,
+      stories: [story],
+    });
+  });
+
+  return Array.from(groups.values()).map((group) => ({
+    ...group,
+    stories: group.stories.sort(
+      (firstStory, secondStory) =>
+        new Date(firstStory.createdAt).getTime() - new Date(secondStory.createdAt).getTime(),
+    ),
+  }));
+}
+
+function formatStoryAge(value: string) {
+  const diffMinutes = Math.max(Math.floor((Date.now() - new Date(value).getTime()) / 60000), 0);
+
+  if (diffMinutes < 1) {
+    return 'maintenant';
+  }
+
+  if (diffMinutes < 60) {
+    return `${diffMinutes} min`;
+  }
+
+  return `${Math.floor(diffMinutes / 60)} h`;
 }
 
 const FeedCard = memo(function FeedCard({
@@ -258,16 +304,29 @@ export default function HomeScreen() {
   const [posts, setPosts] = useState<FeedItem[]>(postsRef.current);
   const [pendingNewPosts, setPendingNewPosts] = useState<FeedPost[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
-  const [activeStory, setActiveStory] = useState<Story | null>(null);
+  const [activeStoryGroup, setActiveStoryGroup] = useState<StoryGroup | null>(null);
+  const [activeStoryIndex, setActiveStoryIndex] = useState(0);
+  const [storyProgress, setStoryProgress] = useState(0);
+  const [storyPaused, setStoryPaused] = useState(false);
+  const [viewedStoryIds, setViewedStoryIds] = useState<Set<string>>(new Set());
   const [storyViewers, setStoryViewers] = useState<StoryViewer[]>([]);
   const [showStoryComposer, setShowStoryComposer] = useState(false);
   const [storyStatus, setStoryStatus] = useState('');
   const [storyText, setStoryText] = useState('');
   const [storyMediaType, setStoryMediaType] = useState<'image' | 'video' | null>(null);
+  const [storyMediaDurationMs, setStoryMediaDurationMs] = useState<number | null>(null);
   const [storyBackground, setStoryBackground] = useState(storyBackgrounds[0]);
+  const socketRef = useRef<Socket | null>(null);
+  const storyTouchStartYRef = useRef(0);
   const theme = seasonThemes[selectedSeason];
   const feed = feedBySeason[selectedSeason];
-  const ownStory = stories.find((story) => story.authorId === user?.id) || null;
+  const storyGroups = useMemo(() => groupStoriesByAuthor(stories), [stories]);
+  const ownStoryGroup = storyGroups.find((group) => group.authorId === user?.id) || null;
+  const activeStory = activeStoryGroup?.stories[activeStoryIndex] || null;
+  const activeStoryDuration =
+    activeStory?.mediaType === 'video' && activeStory.durationMs
+      ? activeStory.durationMs
+      : DEFAULT_STORY_DURATION_MS;
 
   const notificationLabel = useMemo(() => {
     if (pendingNewPosts.length === 0) {
@@ -380,44 +439,124 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
+    if (typeof localStorage === 'undefined') {
+      return;
+    }
+
+    const rawValue = localStorage.getItem('truefeed:viewed-stories');
+
+    if (rawValue) {
+      try {
+        setViewedStoryIds(new Set(JSON.parse(rawValue) as string[]));
+      } catch {
+        setViewedStoryIds(new Set());
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     const interval = setInterval(refreshNewPosts, REFRESH_INTERVAL_MS);
 
     return () => clearInterval(interval);
   }, [refreshNewPosts]);
 
   useEffect(() => {
+    let mounted = true;
+
+    import('socket.io-client')
+      .then(({ io }) => {
+        if (!mounted) {
+          return;
+        }
+
+        socketRef.current = io(env.apiUrl, {
+          transports: ['websocket'],
+          withCredentials: true,
+        });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      mounted = false;
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!activeStory) {
       return undefined;
     }
 
-    let cancelled = false;
     const storyId = activeStory.id;
+    const socket = socketRef.current;
 
-    function refreshStory() {
-      storiesApi
-        .detail(storyId)
-        .then((response) => {
-          if (cancelled) {
-            return;
-          }
+    setStoryProgress(0);
+    socket?.emit('stories:join', storyId);
+    storiesApi
+      .detail(storyId)
+      .then((response) => {
+        setStoryViewers(response.viewers);
+        setStories((currentStories) =>
+          currentStories.map((story) => (story.id === response.story.id ? response.story : story)),
+        );
+      })
+      .catch(() => undefined);
 
-          setActiveStory(response.story);
-          setStoryViewers(response.viewers);
-          setStories((currentStories) =>
-            currentStories.map((story) => (story.id === response.story.id ? response.story : story)),
-          );
-        })
-        .catch(() => undefined);
+    if (isAuthenticated) {
+      storiesApi.markViewed(storyId).catch(() => undefined);
     }
 
-    refreshStory();
-    const interval = setInterval(refreshStory, 5000);
+    setViewedStoryIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+
+      nextIds.add(storyId);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('truefeed:viewed-stories', JSON.stringify(Array.from(nextIds)));
+      }
+
+      return nextIds;
+    });
+
+    function handleViewed(payload: { storyId: string; story: Story; viewers: StoryViewer[] }) {
+      if (payload.storyId !== storyId) {
+        return;
+      }
+
+      setStoryViewers(payload.viewers);
+      setStories((currentStories) =>
+        currentStories.map((story) => (story.id === payload.story.id ? payload.story : story)),
+      );
+    }
+
+    socket?.on('stories:viewed', handleViewed);
 
     return () => {
-      cancelled = true;
-      clearInterval(interval);
+      socket?.emit('stories:leave', storyId);
+      socket?.off('stories:viewed', handleViewed);
     };
-  }, [activeStory?.id, t]);
+  }, [activeStory?.id, isAuthenticated]);
+
+  useEffect(() => {
+    if (!activeStory || storyPaused) {
+      return undefined;
+    }
+
+    const interval = setInterval(() => {
+      setStoryProgress((currentProgress) => {
+        const nextProgress = currentProgress + 100 / activeStoryDuration;
+
+        if (nextProgress >= 1) {
+          setTimeout(() => showNextStory(), 0);
+          return 1;
+        }
+
+        return nextProgress;
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [activeStory, activeStoryDuration, storyPaused]);
 
   async function pickStoryMedia() {
     const ImagePicker = await import('expo-image-picker');
@@ -434,7 +573,10 @@ export default function HomeScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setStoryMediaType(result.assets[0].type === 'video' ? 'video' : 'image');
+      const asset = result.assets[0];
+
+      setStoryMediaType(asset.type === 'video' ? 'video' : 'image');
+      setStoryMediaDurationMs(asset.type === 'video' && asset.duration ? asset.duration : null);
     }
   }
 
@@ -453,6 +595,7 @@ export default function HomeScreen() {
       const response = await storiesApi.create({
         text: storyText.trim() || undefined,
         mediaType: storyMediaType || undefined,
+        durationMs: storyMediaDurationMs || undefined,
         backgroundColor: storyBackground,
       });
 
@@ -460,10 +603,17 @@ export default function HomeScreen() {
         response.story,
         ...currentStories.filter((story) => story.id !== response.story.id),
       ]);
-      setActiveStory(response.story);
+      setActiveStoryGroup({
+        authorId: response.story.authorId,
+        author: response.story.author,
+        authorName: response.story.authorName,
+        stories: [response.story],
+      });
+      setActiveStoryIndex(0);
       setStoryViewers([]);
       setStoryText('');
       setStoryMediaType(null);
+      setStoryMediaDurationMs(null);
       setStoryStatus('');
       setShowStoryComposer(false);
     } catch {
@@ -471,13 +621,48 @@ export default function HomeScreen() {
     }
   }
 
-  async function openStory(story: Story) {
-    setActiveStory(story);
+  function closeStories() {
+    setActiveStoryGroup(null);
+    setActiveStoryIndex(0);
+    setStoryProgress(0);
     setStoryViewers([]);
+    setStoryPaused(false);
+  }
 
-    if (isAuthenticated) {
-      storiesApi.markViewed(story.id).catch(() => undefined);
+  function showNextStory() {
+    if (!activeStoryGroup) {
+      return;
     }
+
+    if (activeStoryIndex < activeStoryGroup.stories.length - 1) {
+      setActiveStoryIndex((index) => index + 1);
+      return;
+    }
+
+    closeStories();
+  }
+
+  function showPreviousStory() {
+    if (!activeStoryGroup) {
+      return;
+    }
+
+    if (storyProgress > 0.25) {
+      setStoryProgress(0);
+      return;
+    }
+
+    if (activeStoryIndex > 0) {
+      setActiveStoryIndex((index) => index - 1);
+    }
+  }
+
+  function openStoryGroup(group: StoryGroup, index = 0) {
+    setActiveStoryGroup(group);
+    setActiveStoryIndex(index);
+    setStoryProgress(0);
+    setStoryViewers([]);
+    setStoryPaused(false);
   }
 
   return (
@@ -527,15 +712,15 @@ export default function HomeScreen() {
               contentContainerStyle={styles.storyRow}
             >
               <Pressable
-                onPress={() => (ownStory ? openStory(ownStory) : setShowStoryComposer(true))}
+                onPress={() => (ownStoryGroup ? openStoryGroup(ownStoryGroup) : setShowStoryComposer(true))}
                 style={styles.storyItem}
               >
                 <View
                   style={[
                     styles.storyCircle,
                     {
-                      borderColor: ownStory ? theme.accentStrong : theme.border,
-                      backgroundColor: ownStory?.backgroundColor || theme.surface,
+                      borderColor: ownStoryGroup ? theme.accentStrong : theme.border,
+                      backgroundColor: ownStoryGroup?.stories[0]?.backgroundColor || theme.surface,
                     },
                   ]}
                 >
@@ -551,32 +736,31 @@ export default function HomeScreen() {
                 </View>
                 <Text style={[styles.storyName, { color: theme.muted }]}>{t('feed.yourStory')}</Text>
               </Pressable>
-              {stories
-                .filter((story) => story.authorId !== user?.id)
-                .map((story) => (
-                  <Pressable key={story.id} onPress={() => openStory(story)} style={styles.storyItem}>
-                    <View style={[styles.storyRing, { borderColor: theme.accentStrong }]}>
-                      <View style={[styles.storyAvatar, { backgroundColor: story.backgroundColor }]}>
+              {storyGroups
+                .filter((group) => group.authorId !== user?.id)
+                .map((group) => {
+                  const hasUnseenStories = group.stories.some((story) => !viewedStoryIds.has(story.id));
+
+                  return (
+                  <Pressable key={group.authorId} onPress={() => openStoryGroup(group)} style={styles.storyItem}>
+                    <View
+                      style={[
+                        styles.storyRing,
+                        hasUnseenStories ? styles.storyRingUnseen : styles.storyRingSeen,
+                      ]}
+                    >
+                      <View style={[styles.storyAvatar, { backgroundColor: group.stories[0].backgroundColor }]}>
                         <Text style={styles.storyAvatarText}>
-                          {(story.author || story.authorName || 'T').slice(0, 1).toUpperCase()}
+                          {(group.author || group.authorName || 'T').slice(0, 1).toUpperCase()}
                         </Text>
                       </View>
                     </View>
                     <Text style={[styles.storyName, { color: theme.text }]} numberOfLines={1}>
-                      {story.author}
+                      {group.author}
                     </Text>
                   </Pressable>
-                ))}
-              {storyProfiles.map((story) => (
-                <View key={story.name} style={styles.storyItem}>
-                  <View style={[styles.storyRing, { borderColor: story.colors[1] }]}>
-                    <View style={[styles.storyAvatar, { backgroundColor: story.colors[0] }]}>
-                      <Text style={styles.storyAvatarText}>{story.avatar}</Text>
-                    </View>
-                  </View>
-                  <Text style={[styles.storyName, { color: theme.text }]}>{story.name}</Text>
-                </View>
-              ))}
+                  );
+                })}
             </ScrollView>
           </View>
         }
@@ -639,45 +823,109 @@ export default function HomeScreen() {
         {storyStatus ? <Text style={[styles.shareNotice, { color: theme.muted }]}>{storyStatus}</Text> : null}
       </TruefeedModal>
 
-      <TruefeedModal
-        visible={Boolean(activeStory)}
-        theme={theme}
-        title={activeStory?.author || t('feed.yourStory')}
-        message={
-          activeStory
-            ? `${activeStory.viewsCount} ${t('feed.views')}`
-            : undefined
-        }
-        secondaryLabel={t('common.close')}
-        onClose={() => setActiveStory(null)}
-      >
-        {activeStory ? (
-          <View style={[styles.storyViewerPanel, { backgroundColor: activeStory.backgroundColor }]}>
-            <Text style={styles.storyComposerKicker}>
-              {activeStory.mediaType ? t(`feed.media.${activeStory.mediaType}`) : t('feed.media.text')}
-            </Text>
-            <Text style={styles.storyComposerText}>{activeStory.text || t('feed.mediaStory')}</Text>
+      <Modal animationType="fade" transparent={false} visible={Boolean(activeStory)} onRequestClose={closeStories}>
+        {activeStory && activeStoryGroup ? (
+          <View
+            style={styles.fullscreenStory}
+            onTouchStart={(event) => {
+              storyTouchStartYRef.current = event.nativeEvent.pageY;
+            }}
+            onTouchEnd={(event) => {
+              if (event.nativeEvent.pageY - storyTouchStartYRef.current > 80) {
+                closeStories();
+              }
+            }}
+          >
+            {activeStory.mediaUrl ? (
+              <Image source={{ uri: activeStory.mediaUrl }} style={styles.fullscreenStoryMedia} />
+            ) : (
+              <View style={[styles.fullscreenStoryTextPanel, { backgroundColor: activeStory.backgroundColor }]}>
+                <Text style={styles.fullscreenStoryText}>
+                  {activeStory.text || t('feed.mediaStory')}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.storyOverlayTop}>
+              <View style={styles.storyProgressRow}>
+                {activeStoryGroup.stories.map((story, index) => (
+                  <View key={story.id} style={styles.storyProgressTrack}>
+                    <View
+                      style={[
+                        styles.storyProgressFill,
+                        {
+                          width:
+                            index < activeStoryIndex
+                              ? '100%'
+                              : index === activeStoryIndex
+                                ? `${Math.round(storyProgress * 100)}%`
+                                : '0%',
+                        },
+                      ]}
+                    />
+                  </View>
+                ))}
+              </View>
+              <View style={styles.storyHeaderRow}>
+                <View style={styles.storyHeaderAvatar}>
+                  <Text style={styles.storyHeaderAvatarText}>
+                    {(activeStory.author || activeStory.authorName || 'T').slice(0, 1).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.onlineDot} />
+                <Text style={styles.storyHeaderName}>{activeStory.author}</Text>
+                <Text style={styles.storyHeaderAge}>{formatStoryAge(activeStory.createdAt)}</Text>
+                <Pressable onPress={closeStories} style={styles.storyCloseButton}>
+                  <Ionicons name="close" size={22} color="#FFFFFF" />
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.storyTouchLayer}>
+              <Pressable
+                onPress={showPreviousStory}
+                onPressIn={() => setStoryPaused(true)}
+                onPressOut={() => setStoryPaused(false)}
+                style={styles.storyTouchZone}
+              />
+              <Pressable
+                onPress={showNextStory}
+                onPressIn={() => setStoryPaused(true)}
+                onPressOut={() => setStoryPaused(false)}
+                style={styles.storyTouchZone}
+              />
+            </View>
+
+            <View style={styles.storyBottomOverlay}>
+              <Text style={styles.storyViewsText}>
+                {activeStory.viewsCount} {t('feed.views')}
+              </Text>
+              {activeStory.authorId === user?.id ? (
+                <ScrollView style={styles.storyViewersPanel} contentContainerStyle={styles.storyViewersContent}>
+                  {storyViewers.map((viewer) => (
+                    <View key={viewer.id} style={styles.fullscreenViewerRow}>
+                      <View
+                        style={[
+                          styles.viewerDot,
+                          { backgroundColor: viewer.online ? '#22C55E' : '#8E8E93' },
+                        ]}
+                      />
+                      <Text style={styles.fullscreenViewerText}>
+                        {viewer.username || viewer.displayName}
+                      </Text>
+                      <Text style={styles.fullscreenViewerState}>
+                        {viewer.online
+                          ? t('feed.online')
+                          : `${t('feed.offline')} · ${viewer.lastSeenAt ? formatStoryAge(viewer.lastSeenAt) : '-'}`}
+                      </Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              ) : null}
+            </View>
           </View>
         ) : null}
-        <View style={styles.viewerList}>
-          {storyViewers.map((viewer) => (
-            <View key={viewer.id} style={styles.viewerRow}>
-              <View
-                style={[
-                  styles.viewerDot,
-                  { backgroundColor: viewer.online ? '#22C55E' : theme.muted },
-                ]}
-              />
-              <Text style={[styles.viewerText, { color: theme.text }]}>
-                {viewer.username || viewer.displayName}
-              </Text>
-              <Text style={[styles.viewerState, { color: theme.muted }]}>
-                {viewer.online ? t('feed.online') : t('feed.offline')}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </TruefeedModal>
+      </Modal>
     </View>
   );
 }
@@ -711,6 +959,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 82,
   },
+  storyRingUnseen: { borderColor: '#EE2A7B' },
+  storyRingSeen: { borderColor: '#9CA3AF' },
   storyAvatar: {
     alignItems: 'center',
     borderColor: '#FFFFFF',
@@ -799,6 +1049,110 @@ const styles = StyleSheet.create({
   viewerDot: { borderRadius: 5, height: 10, width: 10 },
   viewerText: { flex: 1, fontFamily: fonts.body, fontSize: 14, fontWeight: '900' },
   viewerState: { fontFamily: fonts.body, fontSize: 12, fontWeight: '800' },
+  fullscreenStory: {
+    backgroundColor: '#000000',
+    flex: 1,
+  },
+  fullscreenStoryMedia: {
+    height: '100%',
+    resizeMode: 'cover',
+    width: '100%',
+  },
+  fullscreenStoryTextPanel: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 28,
+  },
+  fullscreenStoryText: {
+    color: '#FFFFFF',
+    fontFamily: fonts.title,
+    fontSize: 44,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  storyOverlayTop: {
+    left: 0,
+    paddingHorizontal: 14,
+    paddingTop: 48,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  storyProgressRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  storyProgressTrack: {
+    backgroundColor: 'rgba(255,255,255,0.32)',
+    borderRadius: 999,
+    flex: 1,
+    height: 3,
+    overflow: 'hidden',
+  },
+  storyProgressFill: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    height: '100%',
+  },
+  storyHeaderRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    paddingTop: 12,
+  },
+  storyHeaderAvatar: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.24)',
+    borderRadius: 17,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  storyHeaderAvatarText: { color: '#FFFFFF', fontFamily: fonts.body, fontSize: 14, fontWeight: '900' },
+  onlineDot: { backgroundColor: '#22C55E', borderRadius: 5, height: 10, width: 10 },
+  storyHeaderName: { color: '#FFFFFF', fontFamily: fonts.body, fontSize: 14, fontWeight: '900' },
+  storyHeaderAge: { color: 'rgba(255,255,255,0.78)', flex: 1, fontFamily: fonts.body, fontSize: 12, fontWeight: '800' },
+  storyCloseButton: {
+    alignItems: 'center',
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  storyTouchLayer: {
+    bottom: 0,
+    flexDirection: 'row',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  storyTouchZone: { flex: 1 },
+  storyBottomOverlay: {
+    bottom: 28,
+    left: 14,
+    position: 'absolute',
+    right: 14,
+  },
+  storyViewsText: { color: '#FFFFFF', fontFamily: fonts.body, fontSize: 14, fontWeight: '900' },
+  storyViewersPanel: {
+    marginTop: 10,
+    maxHeight: 170,
+  },
+  storyViewersContent: {
+    gap: 8,
+  },
+  fullscreenViewerRow: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.38)',
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  fullscreenViewerText: { color: '#FFFFFF', flex: 1, fontFamily: fonts.body, fontSize: 13, fontWeight: '900' },
+  fullscreenViewerState: { color: 'rgba(255,255,255,0.74)', fontFamily: fonts.body, fontSize: 12, fontWeight: '800' },
   postCard: { borderRadius: 28, borderWidth: 1, overflow: 'hidden' },
   postHeader: {
     alignItems: 'center',

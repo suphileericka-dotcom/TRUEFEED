@@ -168,6 +168,7 @@ CREATE TABLE IF NOT EXISTS stories (
   text TEXT,
   media_type TEXT CHECK (media_type IN ('image', 'video')),
   media_url TEXT,
+  duration_ms INTEGER,
   background_color TEXT NOT NULL DEFAULT '#111827',
   status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'archived')),
   expires_at TIMESTAMPTZ NOT NULL DEFAULT now() + interval '24 hours',
