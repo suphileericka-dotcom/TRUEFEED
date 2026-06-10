@@ -1,13 +1,14 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { SpaceIcon } from '@/components/truefeed/ui';
+import { SpaceIcon, TruefeedModal } from '@/components/truefeed/ui';
 import { fonts, seasonThemes, truefeedSpaces, type TruefeedSpaceKey } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
 import { useSession } from '@/hooks/use-session';
+import { goodTipsApi } from '@/services/api/good-tips';
 
 function createTabBarStyle(backgroundColor: string, borderColor: string) {
   return {
@@ -35,6 +36,36 @@ export default function TabLayout() {
   const publishSpace = getSpace('publish');
   const exploreSpace = getSpace('explore');
   const debateSpace = getSpace('debate');
+  const [showWelcomeGift, setShowWelcomeGift] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      return;
+    }
+
+    const storageKey = `truefeed:welcome-gift-seen:${user.id}`;
+
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(storageKey) === 'true') {
+      return;
+    }
+
+    goodTipsApi
+      .rewards()
+      .then((rewards) => {
+        if (rewards.gifts.some((gift) => gift.number === 15 && gift.stock > 0)) {
+          setShowWelcomeGift(true);
+        }
+      })
+      .catch(() => undefined);
+  }, [isAuthenticated, user?.id]);
+
+  function closeWelcomeGift() {
+    if (typeof localStorage !== 'undefined' && user?.id) {
+      localStorage.setItem(`truefeed:welcome-gift-seen:${user.id}`, 'true');
+    }
+
+    setShowWelcomeGift(false);
+  }
 
   return (
     <View style={[styles.shell, { backgroundColor: theme.background }]}>
@@ -128,6 +159,15 @@ export default function TabLayout() {
         }}
       />
       </Tabs>
+      <TruefeedModal
+        visible={showWelcomeGift}
+        theme={theme}
+        title={t('gifts.welcomeTitle')}
+        message={t('gifts.welcomeMessage')}
+        primaryLabel={t('common.confirm')}
+        onClose={closeWelcomeGift}
+        onPrimary={closeWelcomeGift}
+      />
     </View>
   );
 }

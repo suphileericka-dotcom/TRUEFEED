@@ -12,7 +12,8 @@
     "email": "Email",
     "password": "Mot de passe",
     "newPassword": "Nouveau mot de passe",
-    "confirmPassword": "Confirmer le mot de passe"
+    "confirmPassword": "Confirmer le mot de passe",
+    "close": "Fermer"
   },
   "auth": {
     "loginBadge": "Connexion",
@@ -82,7 +83,11 @@
       "image": "Photo",
       "video": "Video",
       "text": "Texte"
-    }
+    },
+    "views": "vues",
+    "online": "En ligne",
+    "offline": "Deconnecte",
+    "mediaStory": "Story media"
   },
   "bonplan": {
     "title": "Bon Plan",
@@ -152,7 +157,8 @@
     "mediaPermission": "Autorise la galerie pour choisir un media.",
     "publishTextFailed": "Impossible de publier ce texte pour le moment.",
     "publishMediaFailed": "Media selectionne. Envoi au feed indisponible pour le moment.",
-    "publishTipFailed": "Impossible de publier ce bon plan pour le moment."
+    "publishTipFailed": "Impossible de publier ce bon plan pour le moment.",
+    "publishStoryFailed": "Impossible de publier cette story pour le moment."
   },
   "status": {
     "creatingAccount": "Création du compte...",
@@ -166,5 +172,9 @@
     "changingPassword": "Modification du mot de passe...",
     "shareReady": "Partage pret",
     "linkReadyToShare": "Lien pret a partager"
+  },
+  "gifts": {
+    "welcomeTitle": "Cadeau de bienvenue",
+    "welcomeMessage": "Tu as recu ton cadeau de bienvenue. Il est disponible dans ta liste de cadeaux."
   }
 }

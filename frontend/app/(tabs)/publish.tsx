@@ -83,10 +83,7 @@ export default function PublishScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: false,
-      mediaTypes:
-        nextMediaType === 'video'
-          ? ImagePicker.MediaTypeOptions.Videos
-          : ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: nextMediaType === 'video' ? ['videos'] : ['images'],
       quality: 0.85,
       videoMaxDuration: 90,
     });

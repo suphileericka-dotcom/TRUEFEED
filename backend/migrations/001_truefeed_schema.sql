@@ -162,6 +162,34 @@ CREATE INDEX IF NOT EXISTS posts_feed_payload_idx ON posts (status, published_at
   INCLUDE (author_id, title, media_type, media_url, likes_count, comments_count, shares_count)
   WHERE status = 'published';
 
+CREATE TABLE IF NOT EXISTS stories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  author_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  text TEXT,
+  media_type TEXT CHECK (media_type IN ('image', 'video')),
+  media_url TEXT,
+  background_color TEXT NOT NULL DEFAULT '#111827',
+  status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'archived')),
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT now() + interval '24 hours',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT stories_content_required CHECK (
+    char_length(btrim(COALESCE(text, ''))) > 0 OR media_type IS NOT NULL OR media_url IS NOT NULL
+  )
+);
+
+CREATE INDEX IF NOT EXISTS stories_active_created_at_idx ON stories (created_at DESC)
+  WHERE status = 'published';
+CREATE INDEX IF NOT EXISTS stories_author_created_at_idx ON stories (author_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS story_views (
+  story_id UUID NOT NULL REFERENCES stories (id) ON DELETE CASCADE,
+  viewer_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  viewed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (story_id, viewer_id)
+);
+
+CREATE INDEX IF NOT EXISTS story_views_story_viewed_at_idx ON story_views (story_id, viewed_at DESC);
+
 CREATE TABLE IF NOT EXISTS tags (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,

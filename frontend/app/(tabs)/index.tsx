@@ -16,8 +16,10 @@ import { useTranslation } from 'react-i18next';
 import { BrandHeader, Chip, TruefeedModal } from '@/components/truefeed/ui';
 import { feedBySeason, fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { useSession } from '@/hooks/use-session';
 import { useTranslatedText } from '@/hooks/use-translated-text';
 import { type FeedPost as ApiFeedPost, postsApi } from '@/services/api/posts';
+import { storiesApi, type Story, type StoryViewer } from '@/services/api/stories';
 
 type FeedPost = {
   id: string;
@@ -247,6 +249,7 @@ const FeedCard = memo(function FeedCard({
 export default function HomeScreen() {
   const { t } = useTranslation();
   const { selectedSeason } = useGlobalSeason();
+  const { isAuthenticated, user } = useSession();
   const listRef = useRef<FlatList<FeedItem>>(null);
   const loadingRef = useRef(false);
   const cursorRef = useRef<string | null>(null);
@@ -254,13 +257,17 @@ export default function HomeScreen() {
   const fallbackIndexRef = useRef(FEED_BATCH_SIZE);
   const [posts, setPosts] = useState<FeedItem[]>(postsRef.current);
   const [pendingNewPosts, setPendingNewPosts] = useState<FeedPost[]>([]);
-  const [hasOwnStory, setHasOwnStory] = useState(false);
+  const [stories, setStories] = useState<Story[]>([]);
+  const [activeStory, setActiveStory] = useState<Story | null>(null);
+  const [storyViewers, setStoryViewers] = useState<StoryViewer[]>([]);
   const [showStoryComposer, setShowStoryComposer] = useState(false);
+  const [storyStatus, setStoryStatus] = useState('');
   const [storyText, setStoryText] = useState('');
   const [storyMediaType, setStoryMediaType] = useState<'image' | 'video' | null>(null);
   const [storyBackground, setStoryBackground] = useState(storyBackgrounds[0]);
   const theme = seasonThemes[selectedSeason];
   const feed = feedBySeason[selectedSeason];
+  const ownStory = stories.find((story) => story.authorId === user?.id) || null;
 
   const notificationLabel = useMemo(() => {
     if (pendingNewPosts.length === 0) {
@@ -366,10 +373,51 @@ export default function HomeScreen() {
   }, [loadNextPage]);
 
   useEffect(() => {
+    storiesApi
+      .list()
+      .then((response) => setStories(response.items))
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
     const interval = setInterval(refreshNewPosts, REFRESH_INTERVAL_MS);
 
     return () => clearInterval(interval);
   }, [refreshNewPosts]);
+
+  useEffect(() => {
+    if (!activeStory) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const storyId = activeStory.id;
+
+    function refreshStory() {
+      storiesApi
+        .detail(storyId)
+        .then((response) => {
+          if (cancelled) {
+            return;
+          }
+
+          setActiveStory(response.story);
+          setStoryViewers(response.viewers);
+          setStories((currentStories) =>
+            currentStories.map((story) => (story.id === response.story.id ? response.story : story)),
+          );
+        })
+        .catch(() => undefined);
+    }
+
+    refreshStory();
+    const interval = setInterval(refreshStory, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [activeStory?.id, t]);
 
   async function pickStoryMedia() {
     const ImagePicker = await import('expo-image-picker');
@@ -380,7 +428,7 @@ export default function HomeScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      mediaTypes: ['images', 'videos'],
       quality: 0.85,
       videoMaxDuration: 30,
     });
@@ -390,13 +438,46 @@ export default function HomeScreen() {
     }
   }
 
-  function publishStory() {
+  async function publishStory() {
     if (!storyText.trim() && !storyMediaType) {
       return;
     }
 
-    setHasOwnStory(true);
-    setShowStoryComposer(false);
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      setStoryStatus(t('common.loading'));
+      const response = await storiesApi.create({
+        text: storyText.trim() || undefined,
+        mediaType: storyMediaType || undefined,
+        backgroundColor: storyBackground,
+      });
+
+      setStories((currentStories) => [
+        response.story,
+        ...currentStories.filter((story) => story.id !== response.story.id),
+      ]);
+      setActiveStory(response.story);
+      setStoryViewers([]);
+      setStoryText('');
+      setStoryMediaType(null);
+      setStoryStatus('');
+      setShowStoryComposer(false);
+    } catch {
+      setStoryStatus(t('errors.publishStoryFailed'));
+    }
+  }
+
+  async function openStory(story: Story) {
+    setActiveStory(story);
+    setStoryViewers([]);
+
+    if (isAuthenticated) {
+      storiesApi.markViewed(story.id).catch(() => undefined);
+    }
   }
 
   return (
@@ -445,22 +526,47 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.storyRow}
             >
-              <Pressable onPress={() => setShowStoryComposer(true)} style={styles.storyItem}>
+              <Pressable
+                onPress={() => (ownStory ? openStory(ownStory) : setShowStoryComposer(true))}
+                style={styles.storyItem}
+              >
                 <View
                   style={[
                     styles.storyCircle,
                     {
-                      borderColor: hasOwnStory ? theme.accentStrong : theme.border,
-                      backgroundColor: theme.surface,
+                      borderColor: ownStory ? theme.accentStrong : theme.border,
+                      backgroundColor: ownStory?.backgroundColor || theme.surface,
                     },
                   ]}
                 >
-                  <View style={[styles.storyPlus, { backgroundColor: theme.accentStrong }]}>
+                  <Pressable
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      setShowStoryComposer(true);
+                    }}
+                    style={[styles.storyPlus, { backgroundColor: theme.accentStrong }]}
+                  >
                     <Ionicons name="add" size={17} color="#FFFFFF" />
-                  </View>
+                  </Pressable>
                 </View>
                 <Text style={[styles.storyName, { color: theme.muted }]}>{t('feed.yourStory')}</Text>
               </Pressable>
+              {stories
+                .filter((story) => story.authorId !== user?.id)
+                .map((story) => (
+                  <Pressable key={story.id} onPress={() => openStory(story)} style={styles.storyItem}>
+                    <View style={[styles.storyRing, { borderColor: theme.accentStrong }]}>
+                      <View style={[styles.storyAvatar, { backgroundColor: story.backgroundColor }]}>
+                        <Text style={styles.storyAvatarText}>
+                          {(story.author || story.authorName || 'T').slice(0, 1).toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.storyName, { color: theme.text }]} numberOfLines={1}>
+                      {story.author}
+                    </Text>
+                  </Pressable>
+                ))}
               {storyProfiles.map((story) => (
                 <View key={story.name} style={styles.storyItem}>
                   <View style={[styles.storyRing, { borderColor: story.colors[1] }]}>
@@ -530,6 +636,47 @@ export default function HomeScreen() {
             {t('feed.chooseMedia')}
           </Text>
         </Pressable>
+        {storyStatus ? <Text style={[styles.shareNotice, { color: theme.muted }]}>{storyStatus}</Text> : null}
+      </TruefeedModal>
+
+      <TruefeedModal
+        visible={Boolean(activeStory)}
+        theme={theme}
+        title={activeStory?.author || t('feed.yourStory')}
+        message={
+          activeStory
+            ? `${activeStory.viewsCount} ${t('feed.views')}`
+            : undefined
+        }
+        secondaryLabel={t('common.close')}
+        onClose={() => setActiveStory(null)}
+      >
+        {activeStory ? (
+          <View style={[styles.storyViewerPanel, { backgroundColor: activeStory.backgroundColor }]}>
+            <Text style={styles.storyComposerKicker}>
+              {activeStory.mediaType ? t(`feed.media.${activeStory.mediaType}`) : t('feed.media.text')}
+            </Text>
+            <Text style={styles.storyComposerText}>{activeStory.text || t('feed.mediaStory')}</Text>
+          </View>
+        ) : null}
+        <View style={styles.viewerList}>
+          {storyViewers.map((viewer) => (
+            <View key={viewer.id} style={styles.viewerRow}>
+              <View
+                style={[
+                  styles.viewerDot,
+                  { backgroundColor: viewer.online ? '#22C55E' : theme.muted },
+                ]}
+              />
+              <Text style={[styles.viewerText, { color: theme.text }]}>
+                {viewer.username || viewer.displayName}
+              </Text>
+              <Text style={[styles.viewerState, { color: theme.muted }]}>
+                {viewer.online ? t('feed.online') : t('feed.offline')}
+              </Text>
+            </View>
+          ))}
+        </View>
       </TruefeedModal>
     </View>
   );
@@ -640,6 +787,18 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   storyMediaButtonText: { fontFamily: fonts.body, fontSize: 14, fontWeight: '900' },
+  storyViewerPanel: {
+    borderRadius: 22,
+    gap: 12,
+    minHeight: 360,
+    justifyContent: 'flex-end',
+    padding: 18,
+  },
+  viewerList: { gap: 10 },
+  viewerRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
+  viewerDot: { borderRadius: 5, height: 10, width: 10 },
+  viewerText: { flex: 1, fontFamily: fonts.body, fontSize: 14, fontWeight: '900' },
+  viewerState: { fontFamily: fonts.body, fontSize: 12, fontWeight: '800' },
   postCard: { borderRadius: 28, borderWidth: 1, overflow: 'hidden' },
   postHeader: {
     alignItems: 'center',

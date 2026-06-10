@@ -12,7 +12,8 @@
     "email": "Email",
     "password": "Password",
     "newPassword": "New password",
-    "confirmPassword": "Confirm password"
+    "confirmPassword": "Confirm password",
+    "close": "Close"
   },
   "auth": {
     "loginBadge": "Login",
@@ -82,7 +83,11 @@
       "image": "Photo",
       "video": "Video",
       "text": "Text"
-    }
+    },
+    "views": "views",
+    "online": "Online",
+    "offline": "Offline",
+    "mediaStory": "Media story"
   },
   "bonplan": {
     "title": "Good Deals",
@@ -152,7 +157,8 @@
     "mediaPermission": "Allow gallery access to choose media.",
     "publishTextFailed": "Unable to publish this text right now.",
     "publishMediaFailed": "Media selected. Sending to the feed is unavailable right now.",
-    "publishTipFailed": "Unable to publish this good deal right now."
+    "publishTipFailed": "Unable to publish this good deal right now.",
+    "publishStoryFailed": "Unable to publish this story right now."
   },
   "status": {
     "creatingAccount": "Creating account...",
@@ -166,5 +172,9 @@
     "changingPassword": "Changing password...",
     "shareReady": "Share ready",
     "linkReadyToShare": "Link ready to share"
+  },
+  "gifts": {
+    "welcomeTitle": "Welcome gift",
+    "welcomeMessage": "You received your welcome gift. It is available in your gifts list."
   }
 }
