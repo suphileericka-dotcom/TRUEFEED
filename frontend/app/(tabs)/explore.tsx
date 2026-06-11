@@ -1,5 +1,6 @@
 // Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -7,19 +8,15 @@ import { MapExplorer } from '@/components/truefeed/map-explorer';
 import { BrandHeader, Chip, ScreenShell } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { useSession } from '@/hooks/use-session';
 import { mapApi, type MapPlace } from '@/services/api/map';
+import { usersApi, type PublicUser } from '@/services/api/users';
 import { getCurrentLocation } from '@/services/location';
 
 type LocationState = {
   lat: number;
   lng: number;
 } | null;
-
-const nearbyPeople = [
-  { id: 'lucas', name: 'lucas.trips', city: 'Paris', avatar: 'L' },
-  { id: 'sara', name: 'sara.city', city: 'Kyoto', avatar: 'S' },
-  { id: 'maya', name: 'maya_explores', city: 'Santorin', avatar: 'M' },
-];
 
 function matchesPlace(place: MapPlace, query: string) {
   return [place.name, place.city, place.category, place.address, ...place.tags]
@@ -31,6 +28,8 @@ function matchesPlace(place: MapPlace, query: string) {
 
 export default function ExploreScreen() {
   const { selectedSeason } = useGlobalSeason();
+  const params = useLocalSearchParams<{ q?: string }>();
+  const { isAuthenticated, user } = useSession();
   const theme = seasonThemes[selectedSeason];
   const [categories, setCategories] = useState<string[]>([]);
   const [places, setPlaces] = useState<MapPlace[]>([]);
@@ -41,7 +40,8 @@ export default function ExploreScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState<MapPlace[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [addedPeople, setAddedPeople] = useState<Set<string>>(new Set());
+  const [people, setPeople] = useState<PublicUser[]>([]);
+  const [peopleStatus, setPeopleStatus] = useState('');
 
   const visibleCategories = useMemo(
     () => (categories.length > 0 ? categories : ['Monument', 'Musee', 'Food']),
@@ -71,8 +71,16 @@ export default function ExploreScreen() {
   }, [searchSuggestions, visiblePlaces]);
 
   useEffect(() => {
+    if (typeof params.q === 'string' && params.q.trim()) {
+      setSearchQuery(params.q);
+      setIsSearchFocused(true);
+    }
+  }, [params.q]);
+
+  useEffect(() => {
     let isMounted = true;
 
+    setPeopleStatus('');
     mapApi
       .listCategories()
       .then((result) => {
@@ -120,6 +128,27 @@ export default function ExploreScreen() {
       isMounted = false;
     };
   }, [location?.lat, location?.lng, selectedCategory]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    usersApi
+      .listPublic({ limit: 10, viewerId: user?.id })
+      .then((result) => {
+        if (isMounted) {
+          setPeople(result.items);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setPeople([]);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     setSelectedPlace(
@@ -187,6 +216,25 @@ export default function ExploreScreen() {
   function submitSearch() {
     if (suggestions[0]) {
       selectPlace(suggestions[0]);
+    }
+  }
+
+  async function sendFriendRequest(person: PublicUser) {
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      await usersApi.sendFriendRequest(person.id);
+      setPeople((current) =>
+        current.map((item) =>
+          item.id === person.id ? { ...item, relation: 'pending_sent' } : item,
+        ),
+      );
+      setPeopleStatus(`Demande envoyee a @${person.username}.`);
+    } catch {
+      setPeopleStatus('Impossible d envoyer la demande pour le moment.');
     }
   }
 
@@ -311,41 +359,56 @@ export default function ExploreScreen() {
       </View>
 
       <View style={[styles.peoplePanel, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.peopleTitle, { color: theme.text }]}>Personnes autour</Text>
-        {nearbyPeople.map((person) => {
-          const added = addedPeople.has(person.id);
+        <Text style={[styles.peopleTitle, { color: theme.text }]}>Utilisateurs TRUEFEED</Text>
+        {peopleStatus ? (
+          <Text style={[styles.peopleStatus, { color: theme.muted }]}>{peopleStatus}</Text>
+        ) : null}
+        {people.length === 0 ? (
+          <Text style={[styles.personMeta, { color: theme.muted }]}>
+            Aucun autre compte reel disponible pour le moment.
+          </Text>
+        ) : null}
+        {people.map((person) => {
+          const initial = person.displayName?.[0] || person.username[0] || '?';
+          const requestDisabled =
+            person.relation === 'self' ||
+            person.relation === 'friends' ||
+            person.relation === 'pending_sent' ||
+            person.relation === 'pending_received';
+          const buttonIcon =
+            person.relation === 'friends'
+              ? 'checkmark'
+              : person.relation === 'pending_sent'
+                ? 'time-outline'
+                : person.relation === 'pending_received'
+                  ? 'mail-outline'
+                  : 'add';
 
           return (
             <View key={person.id} style={styles.personRow}>
               <View style={[styles.personAvatar, { backgroundColor: theme.accentSoft }]}>
                 <Text style={[styles.personAvatarText, { color: theme.accentStrong }]}>
-                  {person.avatar}
+                  {initial.toUpperCase()}
                 </Text>
               </View>
               <View style={styles.personCopy}>
-                <Text style={[styles.personName, { color: theme.text }]}>{person.name}</Text>
+                <Text style={[styles.personName, { color: theme.text }]}>{person.displayName}</Text>
                 <Text style={[styles.personMeta, { color: theme.muted }]}>
-                  {location ? `Dans la zone ${selectedPlace?.city || person.city}` : 'Active le GPS pour affiner'}
+                  @{person.username} - {person.stats.posts} posts
                 </Text>
               </View>
               <Pressable
-                onPress={() =>
-                  setAddedPeople((current) => {
-                    const next = new Set(current);
-
-                    next.add(person.id);
-                    return next;
-                  })
-                }
+                disabled={requestDisabled}
+                onPress={() => sendFriendRequest(person)}
                 style={[
                   styles.addFriendButton,
-                  { backgroundColor: added ? theme.surfaceAlt : theme.accentStrong },
+                  { backgroundColor: requestDisabled ? theme.surfaceAlt : theme.accentStrong },
                 ]}
               >
                 <Ionicons
-                  name={added ? 'checkmark' : 'add'}
+                  name={buttonIcon}
                   size={20}
-                  color={added ? theme.accentStrong : '#FFFFFF'}
+                  color={requestDisabled ? theme.accentStrong : '#FFFFFF'}
                 />
               </Pressable>
             </View>
@@ -401,6 +464,7 @@ const styles = StyleSheet.create({
   placeCopy: { fontFamily: fonts.body, fontSize: 15, lineHeight: 23 },
   peoplePanel: { borderRadius: 26, borderWidth: 1, gap: 14, padding: 18 },
   peopleTitle: { fontFamily: fonts.title, fontSize: 28, fontWeight: '700' },
+  peopleStatus: { fontFamily: fonts.body, fontSize: 13, fontWeight: '800', lineHeight: 19 },
   personRow: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   personAvatar: { alignItems: 'center', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
   personAvatarText: { fontFamily: fonts.body, fontSize: 17, fontWeight: '900' },

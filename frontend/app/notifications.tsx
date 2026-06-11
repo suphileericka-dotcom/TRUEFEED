@@ -1,51 +1,84 @@
 // Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, seasonThemes } from '@/constants/truefeed';
 import { useGlobalSeason } from '@/hooks/use-global-season';
+import { useSession } from '@/hooks/use-session';
+import { usersApi, type FriendRequestNotification } from '@/services/api/users';
 
 type NotificationItem = {
   id: string;
   title: string;
   body: string;
   type?: 'follow_request' | 'activity';
+  request?: FriendRequestNotification;
 };
-
-const initialNotifications: NotificationItem[] = [
-  {
-    id: 'follow-lucas',
-    title: 'Demande de suivi',
-    body: 'lucas.trips veut te suivre.',
-    type: 'follow_request',
-  },
-  {
-    id: 'follow-sara',
-    title: 'Demande de suivi',
-    body: 'sara.city veut te suivre.',
-    type: 'follow_request',
-  },
-  { id: 'like-nora', title: 'Nouveau like', body: 'nora.nomad a aime ton post.', type: 'activity' },
-  { id: 'comment-maya', title: 'Nouveau commentaire', body: 'maya_explores a commente ton post Kyoto.', type: 'activity' },
-  { id: 'vote-debate', title: 'Nouveau vote', body: 'Ton debat a recu un vote Pour.', type: 'activity' },
-];
 
 export default function NotificationsScreen() {
   const { selectedSeason } = useGlobalSeason();
+  const { isAuthenticated } = useSession();
   const theme = seasonThemes[selectedSeason];
-  const [notifications, setNotifications] = useState(initialNotifications);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [status, setStatus] = useState('');
 
-  function resolveFollowRequest(notification: NotificationItem, accepted: boolean) {
-    setNotifications((current) => current.filter((item) => item.id !== notification.id));
-    setStatus(
-      accepted
-        ? `${notification.body.split(' ')[0]} est maintenant dans tes suivis.`
-        : `${notification.body.split(' ')[0]} reste follower. Ses messages iront dans Demandes.`,
-    );
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setNotifications([]);
+      setStatus('Connecte-toi pour voir tes notifications.');
+      return;
+    }
+
+    let isMounted = true;
+
+    usersApi
+      .listNotifications()
+      .then((response) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setStatus('');
+        setNotifications(
+          response.items.map((request) => ({
+            id: request.id,
+            title: 'Demande d ami',
+            body: `@${request.from.username} veut t ajouter.`,
+            type: 'follow_request',
+            request,
+          })),
+        );
+      })
+      .catch(() => {
+        if (isMounted) {
+          setStatus('Impossible de charger les notifications.');
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated]);
+
+  async function resolveFollowRequest(notification: NotificationItem, accepted: boolean) {
+    if (!notification.request) {
+      return;
+    }
+
+    try {
+      await usersApi.resolveFriendRequest(notification.request.id, accepted);
+      setNotifications((current) => current.filter((item) => item.id !== notification.id));
+      setStatus(
+        accepted
+          ? `@${notification.request.from.username} est maintenant dans tes amis.`
+          : `Demande de @${notification.request.from.username} refusee.`,
+      );
+    } catch {
+      setStatus('Impossible de traiter cette demande.');
+    }
   }
 
   return (
@@ -58,6 +91,12 @@ export default function NotificationsScreen() {
       {status ? (
         <View style={[styles.statusCard, { backgroundColor: theme.surfaceAlt }]}>
           <Text style={[styles.statusText, { color: theme.text }]}>{status}</Text>
+        </View>
+      ) : null}
+
+      {notifications.length === 0 && !status ? (
+        <View style={[styles.statusCard, { backgroundColor: theme.surfaceAlt }]}>
+          <Text style={[styles.statusText, { color: theme.text }]}>Aucune notification pour le moment.</Text>
         </View>
       ) : null}
 

@@ -1,5 +1,6 @@
 // Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -22,38 +23,7 @@ type Plan = {
   author: string;
 };
 
-const initialPlans: Plan[] = [
-  {
-    place: 'Fushimi Inari',
-    address: '68 Fukakusa Yabunouchicho, Fushimi Ward, Kyoto, Japon',
-    category: 'Monument',
-    visualKey: 'monument',
-    budget: '0 EUR',
-    transport: 'Train',
-    rating: 9.8,
-    author: 'nora.nomad',
-  },
-  {
-    place: 'Nishiki Market',
-    address: 'Nishikikoji-dori, Nakagyo Ward, Kyoto, Japon',
-    category: 'Marche',
-    visualKey: 'market',
-    budget: '15 EUR',
-    transport: 'Metro',
-    rating: 9.5,
-    author: 'maya_explores',
-  },
-  {
-    place: 'Montmartre',
-    address: 'Place du Tertre, 75018 Paris, France',
-    category: 'Vue',
-    visualKey: 'viewpoint',
-    budget: '8 EUR',
-    transport: 'Metro',
-    rating: 9.4,
-    author: 'lucas.trips',
-  },
-];
+const initialPlans: Plan[] = [];
 
 function TipVisual({ visualKey }: { visualKey: string }) {
   const { t } = useTranslation();
@@ -79,11 +49,17 @@ function PlanCard({
   plan,
   theme,
   userRating,
+  mode,
+  onChooseMode,
+  onOpenExplore,
   onRate,
 }: {
   plan: Plan;
   theme: (typeof seasonThemes)['summer'];
   userRating?: number;
+  mode?: 'actions' | 'review';
+  onChooseMode: () => void;
+  onOpenExplore: () => void;
   onRate: (stars: number) => void;
 }) {
   const { t } = useTranslation();
@@ -126,20 +102,47 @@ function PlanCard({
         <Text style={[styles.planAuthor, { color: theme.muted }]}>
           {t('bonplan.by')} {plan.author}
         </Text>
-        <View style={styles.starSection}>
-          <Text style={[styles.starLabel, { color: theme.muted }]}>Note ce bon plan</Text>
-          <View style={styles.starRow}>
-            {[1, 2, 3, 4, 5].map((stars) => (
-              <Pressable key={stars} onPress={() => onRate(stars)} style={styles.starButton}>
-                <Ionicons
-                  name={(userRating || 0) >= stars ? 'star' : 'star-outline'}
-                  size={26}
-                  color={(userRating || 0) >= stars ? '#F59E0B' : theme.muted}
-                />
-              </Pressable>
-            ))}
+        {mode ? (
+          <View style={styles.actionPanel}>
+            <Pressable
+              onPress={onOpenExplore}
+              style={[styles.planActionButton, { backgroundColor: theme.accentStrong }]}
+            >
+              <Ionicons name="map-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.planActionText}>Ouvrir sur Explore</Text>
+            </Pressable>
+            <Pressable
+              onPress={onChooseMode}
+              style={[styles.planActionButton, { backgroundColor: theme.surfaceAlt }]}
+            >
+              <Ionicons name="star-outline" size={18} color={theme.accentStrong} />
+              <Text style={[styles.planActionText, { color: theme.accentStrong }]}>Donner un avis</Text>
+            </Pressable>
           </View>
-        </View>
+        ) : (
+          <Pressable
+            onPress={onChooseMode}
+            style={[styles.mainPlanButton, { backgroundColor: theme.surfaceAlt }]}
+          >
+            <Ionicons name="ellipsis-horizontal" size={20} color={theme.accentStrong} />
+          </Pressable>
+        )}
+        {mode === 'review' ? (
+          <View style={styles.starSection}>
+            <Text style={[styles.starLabel, { color: theme.muted }]}>Ton avis</Text>
+            <View style={styles.starRow}>
+              {[1, 2, 3, 4, 5].map((stars) => (
+                <Pressable key={stars} onPress={() => onRate(stars)} style={styles.starButton}>
+                  <Ionicons
+                    name={(userRating || 0) >= stars ? 'star' : 'star-outline'}
+                    size={26}
+                    color={(userRating || 0) >= stars ? '#F59E0B' : theme.muted}
+                  />
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -151,6 +154,8 @@ export default function BonPlanScreen() {
   const theme = seasonThemes[selectedSeason];
   const [plans, setPlans] = useState<Plan[]>(initialPlans);
   const [ratings, setRatings] = useState<Record<string, number>>({});
+  const [openPlanKey, setOpenPlanKey] = useState<string | null>(null);
+  const [reviewPlanKey, setReviewPlanKey] = useState<string | null>(null);
   const sharedCount = plans.length;
   const sortedPlans = useMemo(
     () =>
@@ -179,6 +184,10 @@ export default function BonPlanScreen() {
         };
       }),
     );
+  }
+
+  function openExplore(plan: Plan) {
+    router.push({ pathname: '/explore', params: { q: plan.place } });
   }
 
   useEffect(() => {
@@ -214,12 +223,38 @@ export default function BonPlanScreen() {
       </View>
 
       <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('bonplan.nearby')}</Text>
+      {sortedPlans.length === 0 ? (
+        <View style={[styles.emptyCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.emptyText, { color: theme.muted }]}>
+            Aucun bon plan reel publie pour le moment.
+          </Text>
+        </View>
+      ) : null}
       {sortedPlans.map((plan) => (
         <PlanCard
           key={getPlanKey(plan)}
           plan={plan}
           theme={theme}
           userRating={ratings[getPlanKey(plan)]}
+          mode={
+            reviewPlanKey === getPlanKey(plan)
+              ? 'review'
+              : openPlanKey === getPlanKey(plan)
+                ? 'actions'
+                : undefined
+          }
+          onChooseMode={() => {
+            const planKey = getPlanKey(plan);
+
+            if (openPlanKey === planKey) {
+              setReviewPlanKey(planKey);
+              return;
+            }
+
+            setOpenPlanKey(planKey);
+            setReviewPlanKey(null);
+          }}
+          onOpenExplore={() => openExplore(plan)}
           onRate={(stars) => ratePlan(plan, stars)}
         />
       ))}
@@ -234,6 +269,8 @@ const styles = StyleSheet.create({
   heroNumber: { color: '#FFFFFF', fontFamily: fonts.title, fontSize: 46, fontWeight: '700' },
   heroText: { color: '#FFFFFF', fontFamily: fonts.body, fontSize: 15, fontWeight: '900' },
   sectionTitle: { fontFamily: fonts.title, fontSize: 32, fontWeight: '700' },
+  emptyCard: { borderRadius: 22, borderWidth: 1, padding: 16 },
+  emptyText: { fontFamily: fonts.body, fontSize: 14, fontWeight: '800', lineHeight: 20 },
   planCard: { borderRadius: 24, borderWidth: 1, overflow: 'hidden' },
   visualPanel: {
     alignItems: 'center',
@@ -294,6 +331,24 @@ const styles = StyleSheet.create({
   planAuthor: { fontFamily: fonts.body, fontSize: 12, fontWeight: '800' },
   ratingPill: { borderRadius: 999, paddingHorizontal: 13, paddingVertical: 8 },
   ratingText: { fontFamily: fonts.body, fontSize: 15, fontWeight: '900' },
+  actionPanel: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  mainPlanButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
+    width: 42,
+  },
+  planActionButton: {
+    alignItems: 'center',
+    borderRadius: 18,
+    flexDirection: 'row',
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  planActionText: { color: '#FFFFFF', fontFamily: fonts.body, fontSize: 13, fontWeight: '900' },
   starSection: { gap: 7 },
   starLabel: { fontFamily: fonts.body, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
   starRow: { flexDirection: 'row', gap: 6 },
