@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/quicktime'];
 
 const mediaResolver = {

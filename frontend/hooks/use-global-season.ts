@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 import { createContext, createElement, useContext, useEffect, useState, type ReactNode } from 'react';
 
 import { getSeasonFromDate, type SeasonKey } from '@/constants/truefeed';

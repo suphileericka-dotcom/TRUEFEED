@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 import { Tabs } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';

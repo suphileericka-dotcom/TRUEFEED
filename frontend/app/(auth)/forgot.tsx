@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';

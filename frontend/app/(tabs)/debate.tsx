@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -54,6 +55,7 @@ export default function DebateScreen() {
   const [replyVotes, setReplyVotes] = useState<Record<string, VoteValue>>({});
   const [replyReposts, setReplyReposts] = useState<Record<string, boolean>>({});
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
+  const [addedAuthors, setAddedAuthors] = useState<Record<string, boolean>>({});
   const [showAuthNotice, setShowAuthNotice] = useState(false);
 
   const visibleTopics = useMemo(() => {
@@ -142,6 +144,14 @@ export default function DebateScreen() {
     setExpandedReplies((current) => ({ ...current, [replyId]: !current[replyId] }));
   }
 
+  function addAuthor(author: string) {
+    if (!requireAccount()) {
+      return;
+    }
+
+    setAddedAuthors((current) => ({ ...current, [author]: true }));
+  }
+
   function getUpCount(topic: (typeof debateTopics)[number]) {
     return topic.percent + (votes[topic.id] === 'for' ? 1 : 0);
   }
@@ -169,6 +179,22 @@ export default function DebateScreen() {
         <View style={styles.threadContent}>
           <View style={styles.threadHeader}>
             <Text style={[styles.author, { color: theme.text }]}>{topic.author}</Text>
+            <Pressable
+              onPress={(event) => {
+                event.stopPropagation();
+                addAuthor(topic.author);
+              }}
+              style={[
+                styles.addFriendButton,
+                { backgroundColor: addedAuthors[topic.author] ? theme.surfaceAlt : theme.accentStrong },
+              ]}
+            >
+              <Ionicons
+                name={addedAuthors[topic.author] ? 'checkmark' : 'add'}
+                size={16}
+                color={addedAuthors[topic.author] ? theme.accentStrong : '#FFFFFF'}
+              />
+            </Pressable>
             <Text style={[styles.age, { color: theme.muted }]}>{topic.age}</Text>
           </View>
 
@@ -226,6 +252,19 @@ export default function DebateScreen() {
         <View style={styles.threadContent}>
           <View style={styles.threadHeader}>
             <Text style={[styles.author, { color: theme.text }]}>{item.author}</Text>
+            <Pressable
+              onPress={() => addAuthor(item.author)}
+              style={[
+                styles.addFriendButton,
+                { backgroundColor: addedAuthors[item.author] ? theme.surfaceAlt : theme.accentStrong },
+              ]}
+            >
+              <Ionicons
+                name={addedAuthors[item.author] ? 'checkmark' : 'add'}
+                size={16}
+                color={addedAuthors[item.author] ? theme.accentStrong : '#FFFFFF'}
+              />
+            </Pressable>
             <Text style={[styles.age, { color: theme.muted }]}>{item.age}</Text>
           </View>
           <Text style={[styles.threadBody, { color: theme.text }]}>{item.text}</Text>
@@ -427,6 +466,7 @@ const styles = StyleSheet.create({
   avatarText: { fontFamily: fonts.body, fontSize: 22, fontWeight: '900' },
   threadContent: { flex: 1, gap: 8 },
   threadHeader: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  addFriendButton: { alignItems: 'center', borderRadius: 14, height: 28, justifyContent: 'center', width: 28 },
   author: { fontFamily: fonts.body, fontSize: 18, fontWeight: '900' },
   age: { fontFamily: fonts.body, fontSize: 16, fontWeight: '800' },
   threadTitle: { fontFamily: fonts.body, fontSize: 24, fontWeight: '900', lineHeight: 31 },

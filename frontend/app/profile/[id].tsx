@@ -1,6 +1,8 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Chip, ScreenShell, SectionLabel } from '@/components/truefeed/ui';
 import { fonts, publicProfile, seasonThemes } from '@/constants/truefeed';
@@ -10,6 +12,7 @@ export default function PublicProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
+  const [added, setAdded] = useState(false);
 
   return (
     <ScreenShell theme={theme}>
@@ -25,6 +28,18 @@ export default function PublicProfileScreen() {
         <Text style={[styles.name, { color: theme.text }]}>{publicProfile.displayName}</Text>
         <Text style={[styles.username, { color: theme.muted }]}>@{publicProfile.username}</Text>
         <Text style={[styles.bio, { color: theme.muted }]}>{publicProfile.bio}</Text>
+        <Pressable
+          onPress={() => setAdded(true)}
+          style={[
+            styles.addFriendButton,
+            { backgroundColor: added ? theme.surfaceAlt : theme.accentStrong },
+          ]}
+        >
+          <Ionicons name={added ? 'checkmark' : 'add'} size={20} color={added ? theme.accentStrong : '#FFFFFF'} />
+          <Text style={[styles.addFriendText, { color: added ? theme.accentStrong : '#FFFFFF' }]}>
+            {added ? 'Ajoute' : 'Ajouter'}
+          </Text>
+        </Pressable>
       </View>
 
       <View style={styles.stats}>
@@ -68,6 +83,16 @@ const styles = StyleSheet.create({
   name: { fontFamily: fonts.title, fontSize: 36, fontWeight: '700' },
   username: { fontFamily: fonts.body, fontSize: 15, fontWeight: '800' },
   bio: { fontFamily: fonts.body, fontSize: 15, lineHeight: 23, textAlign: 'center' },
+  addFriendButton: {
+    alignItems: 'center',
+    borderRadius: 999,
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  addFriendText: { fontFamily: fonts.body, fontSize: 14, fontWeight: '900' },
   stats: { flexDirection: 'row', gap: 10 },
   stat: { alignItems: 'center', borderRadius: 20, flex: 1, gap: 4, padding: 14 },
   statValue: { fontFamily: fonts.title, fontSize: 26, fontWeight: '700' },

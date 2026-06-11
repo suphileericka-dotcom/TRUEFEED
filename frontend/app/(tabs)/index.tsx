@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -470,7 +471,7 @@ export default function HomeScreen() {
         setPendingNewPosts(incoming);
       }
     } catch {
-      // Background refresh should stay silent while the user scrolls.
+      // Le rafraichissement en arriere-plan reste silencieux pendant le defilement.
     }
   }, []);
 

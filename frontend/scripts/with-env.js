@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');

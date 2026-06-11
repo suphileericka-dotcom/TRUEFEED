@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 const { query: dbQuery } = require('../data/db');
 
 const supportedTypes = new Set(['all', 'destination', 'tag', 'user', 'post']);

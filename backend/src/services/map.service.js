@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 const { query } = require('../data/db');
 
 const categories = ['Monument', 'Musee', 'Food', 'Montagne', 'Vue', 'Marche'];

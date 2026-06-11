@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 import { useEffect, useState } from 'react';
 
 import type { AuthResponse, AuthSession, AuthUser } from '@/services/api/auth';

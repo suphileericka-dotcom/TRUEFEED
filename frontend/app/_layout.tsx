@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 import { Stack } from 'expo-router';
 import 'react-native-reanimated';
 import '@/i18n';

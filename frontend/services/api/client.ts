@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 import { env } from '@/constants/env';
 import { trackError } from '@/services/monitoring';
 import {

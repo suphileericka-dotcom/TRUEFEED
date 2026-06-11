@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
@@ -31,6 +32,7 @@ export default function PostDetailScreen() {
   );
   const [replyTo, setReplyTo] = useState<(typeof visibleComments)[number] | null>(null);
   const [shared, setShared] = useState(false);
+  const [addedAuthors, setAddedAuthors] = useState<Record<string, boolean>>({});
 
   async function sendComment() {
     const content = comment.trim();
@@ -154,7 +156,22 @@ export default function PostDetailScreen() {
           key={item.id}
           style={[styles.comment, { backgroundColor: theme.surface, borderColor: theme.border }]}
         >
-          <Text style={[styles.commentAuthor, { color: theme.text }]}>{item.author}</Text>
+          <View style={styles.commentHeader}>
+            <Text style={[styles.commentAuthor, { color: theme.text }]}>{item.author}</Text>
+            <Pressable
+              onPress={() => setAddedAuthors((current) => ({ ...current, [item.author]: true }))}
+              style={[
+                styles.addFriendButton,
+                { backgroundColor: addedAuthors[item.author] ? theme.surfaceAlt : theme.accentStrong },
+              ]}
+            >
+              <Ionicons
+                name={addedAuthors[item.author] ? 'checkmark' : 'add'}
+                size={15}
+                color={addedAuthors[item.author] ? theme.accentStrong : '#FFFFFF'}
+              />
+            </Pressable>
+          </View>
           <Text style={[styles.commentText, { color: theme.muted }]}>{item.content}</Text>
           <View style={styles.commentActions}>
             <Pressable onPress={() => likeComment(item.id)} style={styles.action}>
@@ -214,7 +231,9 @@ const styles = StyleSheet.create({
   actionText: { fontFamily: fonts.body, fontSize: 14, fontWeight: '800' },
   blockTitle: { fontFamily: fonts.title, fontSize: 30, fontWeight: '700' },
   comment: { borderRadius: 22, borderWidth: 1, gap: 6, padding: 16 },
+  commentHeader: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   commentAuthor: { fontFamily: fonts.body, fontSize: 15, fontWeight: '800' },
+  addFriendButton: { alignItems: 'center', borderRadius: 13, height: 26, justifyContent: 'center', width: 26 },
   commentText: { fontFamily: fonts.body, fontSize: 15, lineHeight: 23 },
   commentActions: { flexDirection: 'row', gap: 16, paddingTop: 4 },
   replyHint: { fontFamily: fonts.body, fontSize: 13, fontWeight: '900' },

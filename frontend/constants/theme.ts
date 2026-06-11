@@ -1,6 +1,7 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Couleurs utilisees dans l'application pour les modes clair et sombre.
+ * D'autres solutions de style existent, comme Nativewind, Tamagui ou unistyles.
  */
 
 import { Platform } from 'react-native';
@@ -29,13 +30,13 @@ export const Colors = {
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
+    /** Police systeme par defaut d'iOS. */
     sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
+    /** Police serif native d'iOS. */
     serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
+    /** Police arrondie native d'iOS. */
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
+    /** Police monospace native d'iOS. */
     mono: 'ui-monospace',
   },
   default: {

@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 const authConfig = {
   accessToken: {
     secret: process.env.JWT_ACCESS_SECRET || 'change-me-access-secret',

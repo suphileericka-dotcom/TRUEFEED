@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 const { logError } = require('../monitoring/logger');
 
 function notFoundHandler(req, res) {

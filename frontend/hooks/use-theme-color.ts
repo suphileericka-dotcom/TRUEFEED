@@ -1,5 +1,6 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 /**
- * Learn more about light and dark modes:
+ * Gestion des modes clair et sombre.
  * https://docs.expo.dev/guides/color-schemes/
  */
 

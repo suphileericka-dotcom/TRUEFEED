@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 const { authService } = require('../services/auth.service');
 const { createHttpError } = require('../utils/httpError');
 

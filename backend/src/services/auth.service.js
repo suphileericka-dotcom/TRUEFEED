@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 const crypto = require('crypto');
 
 const { authConfig } = require('../config/auth');

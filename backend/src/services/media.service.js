@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 const crypto = require('crypto');
 const { v2: cloudinary } = require('cloudinary');
 

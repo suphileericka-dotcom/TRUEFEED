@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 import { Platform } from 'react-native';
 import type { ComponentProps } from 'react';
 import type { Ionicons } from '@expo/vector-icons';

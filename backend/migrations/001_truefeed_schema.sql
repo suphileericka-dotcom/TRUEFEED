@@ -1,3 +1,4 @@
+-- Ce fichier fait partie du code Truefeed; il documente la structure ou la logique de ce module.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 DO $$ BEGIN

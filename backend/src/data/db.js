@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 const { Pool } = require('pg');
 
 const pool = process.env.DATABASE_URL

@@ -1,3 +1,4 @@
+// Ce fichier fait partie du code Truefeed; il documente la logique de ce module.
 const { app } = require('./app');
 const { env } = require('./config/env');
 const { logInfo } = require('./monitoring/logger');
