@@ -202,6 +202,32 @@ function formatStoryAge(value: string) {
   return `${Math.floor(diffMinutes / 60)} h`;
 }
 
+function StoryMedia({ story, fallbackText }: { story: Story; fallbackText: string }) {
+  const videoPlayer = useVideoPlayer(story.mediaUrl && story.mediaType === 'video' ? story.mediaUrl : '', (player) => {
+    player.loop = true;
+    player.muted = false;
+    if (story.mediaUrl && story.mediaType === 'video') {
+      player.play();
+    }
+  });
+
+  if (story.mediaUrl && story.mediaType === 'video') {
+    return <VideoView player={videoPlayer} style={styles.fullscreenStoryMedia} contentFit="cover" nativeControls={false} />;
+  }
+
+  if (story.mediaUrl) {
+    return <Image source={{ uri: story.mediaUrl }} style={styles.fullscreenStoryMedia} />;
+  }
+
+  return (
+    <View style={[styles.fullscreenStoryTextPanel, { backgroundColor: story.backgroundColor }]}>
+      <Text style={styles.fullscreenStoryText}>
+        {story.text || fallbackText}
+      </Text>
+    </View>
+  );
+}
+
 const FeedCard = memo(function FeedCard({
   post,
   theme,
@@ -215,6 +241,7 @@ const FeedCard = memo(function FeedCard({
   const translatedCaption = useTranslatedText(post.caption);
   const [liked, setLiked] = useState(false);
   const [shared, setShared] = useState(false);
+  const [followingAuthor, setFollowingAuthor] = useState(false);
   const [shareNotice, setShareNotice] = useState('');
   const likesCount = liked ? post.likes + 1 : post.likes;
   const sharesCount = shared ? post.shares + 1 : post.shares;
@@ -241,7 +268,25 @@ const FeedCard = memo(function FeedCard({
           <Text style={[styles.authorName, { color: theme.text }]}>{post.author}</Text>
           <Text style={[styles.metaText, { color: theme.muted }]}>{translatedLocation}</Text>
         </View>
-        <Ionicons name="ellipsis-horizontal" size={18} color={theme.muted} />
+        <View style={styles.postHeaderActions}>
+          <Pressable
+            onPress={(event) => {
+              event.stopPropagation();
+              setFollowingAuthor(true);
+            }}
+            style={[
+              styles.followButton,
+              { backgroundColor: followingAuthor ? theme.surfaceAlt : theme.accentStrong },
+            ]}
+          >
+            <Ionicons
+              name={followingAuthor ? 'checkmark' : 'add'}
+              size={18}
+              color={followingAuthor ? theme.accentStrong : '#FFFFFF'}
+            />
+          </Pressable>
+          <Ionicons name="ellipsis-horizontal" size={18} color={theme.muted} />
+        </View>
       </View>
 
       <View style={[styles.visual, { backgroundColor: theme.accentStrong }]}>
@@ -509,6 +554,27 @@ export default function HomeScreen() {
     };
   }, []);
 
+  const closeStories = useCallback(() => {
+    setActiveStoryGroup(null);
+    setActiveStoryIndex(0);
+    setStoryProgress(0);
+    setStoryViewers([]);
+    setStoryPaused(false);
+  }, []);
+
+  const showNextStory = useCallback(() => {
+    if (!activeStoryGroup) {
+      return;
+    }
+
+    if (activeStoryIndex < activeStoryGroup.stories.length - 1) {
+      setActiveStoryIndex((index) => index + 1);
+      return;
+    }
+
+    closeStories();
+  }, [activeStoryGroup, activeStoryIndex, closeStories]);
+
   useEffect(() => {
     if (!activeStory) {
       return undefined;
@@ -561,7 +627,7 @@ export default function HomeScreen() {
       socket?.emit('stories:leave', storyId);
       socket?.off('stories:viewed', handleViewed);
     };
-  }, [activeStory?.id, isAuthenticated]);
+  }, [activeStory, isAuthenticated]);
 
   useEffect(() => {
     if (!activeStory || storyPaused) {
@@ -582,7 +648,7 @@ export default function HomeScreen() {
     }, 100);
 
     return () => clearInterval(interval);
-  }, [activeStory, activeStoryDuration, storyPaused]);
+  }, [activeStory, activeStoryDuration, showNextStory, storyPaused]);
 
   async function pickStoryMedia() {
     const ImagePicker = await import('expo-image-picker');
@@ -647,28 +713,7 @@ export default function HomeScreen() {
     }
   }
 
-  function closeStories() {
-    setActiveStoryGroup(null);
-    setActiveStoryIndex(0);
-    setStoryProgress(0);
-    setStoryViewers([]);
-    setStoryPaused(false);
-  }
-
-  function showNextStory() {
-    if (!activeStoryGroup) {
-      return;
-    }
-
-    if (activeStoryIndex < activeStoryGroup.stories.length - 1) {
-      setActiveStoryIndex((index) => index + 1);
-      return;
-    }
-
-    closeStories();
-  }
-
-  function showPreviousStory() {
+  const showPreviousStory = useCallback(() => {
     if (!activeStoryGroup) {
       return;
     }
@@ -681,15 +726,15 @@ export default function HomeScreen() {
     if (activeStoryIndex > 0) {
       setActiveStoryIndex((index) => index - 1);
     }
-  }
+  }, [activeStoryGroup, activeStoryIndex, storyProgress]);
 
-  function openStoryGroup(group: StoryGroup, index = 0) {
+  const openStoryGroup = useCallback((group: StoryGroup, index = 0) => {
     setActiveStoryGroup(group);
     setActiveStoryIndex(index);
     setStoryProgress(0);
     setStoryViewers([]);
     setStoryPaused(false);
-  }
+  }, []);
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -862,15 +907,7 @@ export default function HomeScreen() {
               }
             }}
           >
-            {activeStory.mediaUrl ? (
-              <Image source={{ uri: activeStory.mediaUrl }} style={styles.fullscreenStoryMedia} />
-            ) : (
-              <View style={[styles.fullscreenStoryTextPanel, { backgroundColor: activeStory.backgroundColor }]}>
-                <Text style={styles.fullscreenStoryText}>
-                  {activeStory.text || t('feed.mediaStory')}
-                </Text>
-              </View>
-            )}
+            <StoryMedia story={activeStory} fallbackText={t('feed.mediaStory')} />
 
             <View style={styles.storyOverlayTop}>
               <View style={styles.storyProgressRow}>
@@ -928,7 +965,7 @@ export default function HomeScreen() {
               </Text>
               {activeStory.authorId === user?.id ? (
                 <ScrollView style={styles.storyViewersPanel} contentContainerStyle={styles.storyViewersContent}>
-                  {storyViewers.map((viewer) => (
+                  {storyViewers.filter((viewer) => viewer.id !== user?.id).map((viewer) => (
                     <View key={viewer.id} style={styles.fullscreenViewerRow}>
                       <View
                         style={[
@@ -1186,6 +1223,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 18,
   },
+  postHeaderActions: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  followButton: { alignItems: 'center', borderRadius: 17, height: 34, justifyContent: 'center', width: 34 },
   authorName: { fontFamily: fonts.body, fontSize: 18, fontWeight: '800' },
   metaText: { fontFamily: fonts.body, fontSize: 14, marginTop: 4 },
   visual: { gap: 16, height: 330, padding: 18 },

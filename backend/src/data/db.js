@@ -7,7 +7,7 @@ const pool = process.env.DATABASE_URL
         process.env.DATABASE_SSL === 'false'
           ? false
           : {
-              rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === 'true',
+              rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false',
             },
     })
   : null;

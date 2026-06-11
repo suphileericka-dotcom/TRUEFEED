@@ -103,6 +103,17 @@ async function markViewed(storyId, viewer) {
       throw createHttpError(404, 'story_not_found', 'Story introuvable.');
     }
 
+    if (story.rows[0].author_id === viewer.id) {
+      const views = await client.query(
+        `SELECT COUNT(*)::INTEGER AS views_count
+         FROM story_views
+         WHERE story_id = $1`,
+        [storyId],
+      );
+
+      return views.rows[0].views_count;
+    }
+
     await client.query(`UPDATE users SET last_seen_at = now() WHERE id = $1`, [viewer.id]);
     await client.query(
       `INSERT INTO story_views (story_id, viewer_id)

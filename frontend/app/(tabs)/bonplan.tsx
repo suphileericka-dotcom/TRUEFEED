@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { ScreenShell } from '@/components/truefeed/ui';
@@ -70,12 +70,20 @@ function TipVisual({ visualKey }: { visualKey: string }) {
   );
 }
 
+function getPlanKey(plan: Plan) {
+  return `${plan.place}-${plan.author}-${plan.address}`;
+}
+
 function PlanCard({
   plan,
   theme,
+  userRating,
+  onRate,
 }: {
   plan: Plan;
   theme: (typeof seasonThemes)['summer'];
+  userRating?: number;
+  onRate: (stars: number) => void;
 }) {
   const { t } = useTranslation();
   const translatedPlace = useTranslatedText(plan.place);
@@ -117,6 +125,20 @@ function PlanCard({
         <Text style={[styles.planAuthor, { color: theme.muted }]}>
           {t('bonplan.by')} {plan.author}
         </Text>
+        <View style={styles.starSection}>
+          <Text style={[styles.starLabel, { color: theme.muted }]}>Note ce bon plan</Text>
+          <View style={styles.starRow}>
+            {[1, 2, 3, 4, 5].map((stars) => (
+              <Pressable key={stars} onPress={() => onRate(stars)} style={styles.starButton}>
+                <Ionicons
+                  name={(userRating || 0) >= stars ? 'star' : 'star-outline'}
+                  size={26}
+                  color={(userRating || 0) >= stars ? '#F59E0B' : theme.muted}
+                />
+              </Pressable>
+            ))}
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -127,8 +149,36 @@ export default function BonPlanScreen() {
   const { selectedSeason } = useGlobalSeason();
   const theme = seasonThemes[selectedSeason];
   const [plans, setPlans] = useState<Plan[]>(initialPlans);
+  const [ratings, setRatings] = useState<Record<string, number>>({});
   const sharedCount = plans.length;
-  const sortedPlans = useMemo(() => [...plans].sort((a, b) => b.rating - a.rating), [plans]);
+  const sortedPlans = useMemo(
+    () =>
+      [...plans].sort((a, b) => {
+        const ratingA = ratings[getPlanKey(a)] ? ratings[getPlanKey(a)] * 2 : a.rating;
+        const ratingB = ratings[getPlanKey(b)] ? ratings[getPlanKey(b)] * 2 : b.rating;
+
+        return ratingB - ratingA;
+      }),
+    [plans, ratings],
+  );
+
+  function ratePlan(plan: Plan, stars: number) {
+    const planKey = getPlanKey(plan);
+
+    setRatings((current) => ({ ...current, [planKey]: stars }));
+    setPlans((current) =>
+      current.map((item) => {
+        if (getPlanKey(item) !== planKey) {
+          return item;
+        }
+
+        return {
+          ...item,
+          rating: Math.round(((item.rating / 2 + stars) / 2) * 20) / 10,
+        };
+      }),
+    );
+  }
 
   useEffect(() => {
     goodTipsApi
@@ -165,9 +215,11 @@ export default function BonPlanScreen() {
       <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('bonplan.nearby')}</Text>
       {sortedPlans.map((plan) => (
         <PlanCard
-          key={`${plan.place}-${plan.author}-${plan.address}`}
+          key={getPlanKey(plan)}
           plan={plan}
           theme={theme}
+          userRating={ratings[getPlanKey(plan)]}
+          onRate={(stars) => ratePlan(plan, stars)}
         />
       ))}
     </ScreenShell>
@@ -241,4 +293,8 @@ const styles = StyleSheet.create({
   planAuthor: { fontFamily: fonts.body, fontSize: 12, fontWeight: '800' },
   ratingPill: { borderRadius: 999, paddingHorizontal: 13, paddingVertical: 8 },
   ratingText: { fontFamily: fonts.body, fontSize: 15, fontWeight: '900' },
+  starSection: { gap: 7 },
+  starLabel: { fontFamily: fonts.body, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
+  starRow: { flexDirection: 'row', gap: 6 },
+  starButton: { paddingVertical: 2 },
 });

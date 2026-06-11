@@ -14,6 +14,12 @@ type LocationState = {
   lng: number;
 } | null;
 
+const nearbyPeople = [
+  { id: 'lucas', name: 'lucas.trips', city: 'Paris', avatar: 'L' },
+  { id: 'sara', name: 'sara.city', city: 'Kyoto', avatar: 'S' },
+  { id: 'maya', name: 'maya_explores', city: 'Santorin', avatar: 'M' },
+];
+
 function matchesPlace(place: MapPlace, query: string) {
   return [place.name, place.city, place.category, place.address, ...place.tags]
     .filter(Boolean)
@@ -34,6 +40,7 @@ export default function ExploreScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState<MapPlace[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [addedPeople, setAddedPeople] = useState<Set<string>>(new Set());
 
   const visibleCategories = useMemo(
     () => (categories.length > 0 ? categories : ['Monument', 'Musee', 'Food']),
@@ -301,6 +308,49 @@ export default function ExploreScreen() {
         </View>
         <Text style={[styles.placeCopy, { color: theme.muted }]}>{selectedPlaceCopy}</Text>
       </View>
+
+      <View style={[styles.peoplePanel, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <Text style={[styles.peopleTitle, { color: theme.text }]}>Personnes autour</Text>
+        {nearbyPeople.map((person) => {
+          const added = addedPeople.has(person.id);
+
+          return (
+            <View key={person.id} style={styles.personRow}>
+              <View style={[styles.personAvatar, { backgroundColor: theme.accentSoft }]}>
+                <Text style={[styles.personAvatarText, { color: theme.accentStrong }]}>
+                  {person.avatar}
+                </Text>
+              </View>
+              <View style={styles.personCopy}>
+                <Text style={[styles.personName, { color: theme.text }]}>{person.name}</Text>
+                <Text style={[styles.personMeta, { color: theme.muted }]}>
+                  {location ? `Dans la zone ${selectedPlace?.city || person.city}` : 'Active le GPS pour affiner'}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() =>
+                  setAddedPeople((current) => {
+                    const next = new Set(current);
+
+                    next.add(person.id);
+                    return next;
+                  })
+                }
+                style={[
+                  styles.addFriendButton,
+                  { backgroundColor: added ? theme.surfaceAlt : theme.accentStrong },
+                ]}
+              >
+                <Ionicons
+                  name={added ? 'checkmark' : 'add'}
+                  size={20}
+                  color={added ? theme.accentStrong : '#FFFFFF'}
+                />
+              </Pressable>
+            </View>
+          );
+        })}
+      </View>
     </ScreenShell>
   );
 }
@@ -348,4 +398,13 @@ const styles = StyleSheet.create({
   score: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
   scoreText: { fontFamily: fonts.body, fontSize: 15, fontWeight: '800' },
   placeCopy: { fontFamily: fonts.body, fontSize: 15, lineHeight: 23 },
+  peoplePanel: { borderRadius: 26, borderWidth: 1, gap: 14, padding: 18 },
+  peopleTitle: { fontFamily: fonts.title, fontSize: 28, fontWeight: '700' },
+  personRow: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  personAvatar: { alignItems: 'center', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
+  personAvatarText: { fontFamily: fonts.body, fontSize: 17, fontWeight: '900' },
+  personCopy: { flex: 1, gap: 3 },
+  personName: { fontFamily: fonts.body, fontSize: 16, fontWeight: '900' },
+  personMeta: { fontFamily: fonts.body, fontSize: 13, fontWeight: '800' },
+  addFriendButton: { alignItems: 'center', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
 });

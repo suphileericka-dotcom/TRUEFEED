@@ -91,6 +91,8 @@ export default function MessagesScreen() {
   const [showGifts, setShowGifts] = useState(false);
   const [hoveredConversationId, setHoveredConversationId] = useState<string | null>(null);
   const [deleteCandidate, setDeleteCandidate] = useState<Conversation | null>(null);
+  const [messageRequests, setMessageRequests] = useState(requests);
+  const [requestCandidate, setRequestCandidate] = useState<Conversation | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [conversationSearch, setConversationSearch] = useState('');
@@ -103,7 +105,7 @@ export default function MessagesScreen() {
     }
   }, [isAuthenticated]);
 
-  const visibleConversations = (tab === 'messages' ? conversationList : requests).filter((conversation) => {
+  const visibleConversations = (tab === 'messages' ? conversationList : messageRequests).filter((conversation) => {
     const search = conversationSearch.trim().toLowerCase();
 
     if (!search) {
@@ -151,6 +153,25 @@ export default function MessagesScreen() {
 
     setConversationList((current) => current.filter((conversation) => conversation.id !== deleteCandidate.id));
     setDeleteCandidate(null);
+  }
+
+  function moveRequestToInbox() {
+    if (!requestCandidate) {
+      return;
+    }
+
+    setConversationList((current) => [
+      { ...requestCandidate, status: 'Deplace dans ta messagerie' },
+      ...current,
+    ]);
+    setMessageRequests((current) => current.filter((conversation) => conversation.id !== requestCandidate.id));
+    setSelectedConversation(requestCandidate);
+    setRequestCandidate(null);
+    setTab('messages');
+  }
+
+  function ignoreRequest() {
+    setRequestCandidate(null);
   }
 
   if (selectedConversation) {
@@ -297,7 +318,14 @@ export default function MessagesScreen() {
       {visibleConversations.map((conversation) => (
         <Pressable
           key={conversation.id}
-          onPress={() => setSelectedConversation(conversation)}
+          onPress={() => {
+            if (tab === 'requests') {
+              setRequestCandidate(conversation);
+              return;
+            }
+
+            setSelectedConversation(conversation);
+          }}
           onLongPress={() => tab === 'messages' && setDeleteCandidate(conversation)}
           onHoverIn={() => tab === 'messages' && setHoveredConversationId(conversation.id)}
           onHoverOut={() => setHoveredConversationId(null)}
@@ -346,6 +374,21 @@ export default function MessagesScreen() {
         secondaryLabel="Annuler"
         onClose={() => setDeleteCandidate(null)}
         onPrimary={deleteConversation}
+      />
+
+      <TruefeedModal
+        visible={Boolean(requestCandidate)}
+        theme={theme}
+        title="Lire cette demande ?"
+        message={
+          requestCandidate
+            ? `${requestCandidate.name} n'est pas dans tes suivis. Tu peux deplacer cette discussion dans la messagerie ou la laisser dans Demandes.`
+            : undefined
+        }
+        primaryLabel="Deplacer"
+        secondaryLabel="Ignorer"
+        onClose={ignoreRequest}
+        onPrimary={moveRequestToInbox}
       />
     </ScreenShell>
   );
